@@ -218,3 +218,11 @@ rsconnect
 inst/shinyApp/temp.ini
 inst/shinyApp/test.ini
 packrat/lib*/
+
+
+# Project related things to ignore 
+*logs*
+
+
+
+
