@@ -25,7 +25,7 @@ update_ini <- function(path, params){
   
   for (pname in names(params)) {
     hector_recognized_param_string <- match.fun(pname)()
-    inifile_contents[grepl(pattern = hector_recognized_param_string, x = inifile_contents)] <- paste0(hector_recognized_param_string, "=", params[[pname]], ";")
+    inifile_contents[grepl(pattern = paste0(hector_recognized_param_string, "="), x = inifile_contents)] <- paste0(hector_recognized_param_string, "=", params[[pname]], ";")
   }
   
   writeLines(inifile_contents, con = file.path(INPUTDIR, inifile_name))
