@@ -1,0 +1,410 @@
+---
+title: "Hector free running vs [CO2] driven"
+output:
+  html_notebook:
+    toc: yes
+    toc_depth: '4'
+    toc_float: yes
+    number_sections: true
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+# Set Up 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, message = FALSE)
+# see https://bookdown.org/yihui/rmarkdown-cookbook/ for more info on markdowns
+```
+
+```{r}
+# Make sure to sint
+remotes::install_github("JGCRI/hector@land_tracking")
+library(hector)
+
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+BASE_DIR <- here::here()
+
+theme_set(theme_bw())
+```
+
+## Objective 
+
+Here we are trying to take a look at how free running Hector vs concentration driven Hector compare with one another. As of 4/21 historical CO2 is too low, how does that impact future temperature? Is there anyways to adjust it? 
+
+
+# Free running Hector 
+
+Run Hector in free running mode entirely emission driven. 
+
+```{r}
+yrs <- 1850:2100 
+vars <- c(GLOBAL_TEMP(), ATMOSPHERIC_CO2(), NPP(), HEAT_FLUX())
+```
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+   # name <- paste0(name, " free running")
+    core <- newcore(f, name = name)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "free running"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  free_running_out
+```
+
+
+# CO2 driven Hector
+
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    scn_name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    #name <- paste0(name, " co2 driven")
+    name <- paste0(scn_name)
+    
+    data_path <- list.files( system.file("input/tables", package = "hector"), pattern = scn_name, full.names = TRUE)
+    data <- read.csv(data_path, comment.char = ";")
+    
+    core <- newcore(f, name = name)
+    setvar(core, data$Date, var = CO2_CONSTRAIN(), values = data$CO2_constrain, unit = getunits(CO2_CONSTRAIN()))
+    reset(core)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "co2 driven"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  co2_driven
+```
+
+
+# Historic CO~2~ driven Hector
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+
+    data_path <- list.files( system.file("input/tables", package = "hector"), pattern = name, full.names = TRUE)
+    data <- read.csv(data_path, comment.char = ";") %>% 
+      filter(Date %in% 1750:2015)
+    
+    core <- newcore(f, name = name, suppresslogging = FALSE, loglevel = LL_DEBUG())
+    setvar(core, data$Date, var = CO2_CONSTRAIN(), values = data$CO2_constrain, unit = getunits(CO2_CONSTRAIN()))
+    reset(core)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "hist. co2 driven"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  co2_driven_hist
+```
+
+# Comparison Plots
+
+```{r}
+var <- ATMOSPHERIC_CO2()
+rbind(co2_driven, free_running_out, co2_driven_hist) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+```{r}
+var <- GLOBAL_TEMP()
+rbind(co2_driven, free_running_out, co2_driven_hist) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+```{r}
+var <- NPP()
+rbind(co2_driven, free_running_out, co2_driven_hist) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+# Percent Difference 
+
+```{r}
+var <- NPP()
+rbind(co2_driven, free_running_out, co2_driven_hist) %>%  
+  spread(type, value) %>%  
+  mutate(dif =  100 * (`hist. co2 driven` - `co2 driven`) / `co2 driven`) -> 
+  dif_df
+```
+
+```{r}
+var <- ATMOSPHERIC_CO2()
+dif_df %>%  
+  filter(variable == var & year %in% 2000:2100) %>%  
+  ggplot(aes(year, dif)) + 
+  geom_vline(xintercept = 2015, color = "red") + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var,y = "%") 
+```
+
+```{r}
+var <- GLOBAL_TEMP()
+dif_df %>%  
+  filter(variable == var) %>%  
+  ggplot(aes(year, dif)) + 
+  geom_vline(xintercept = 2015, color = "red") + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var, y = "%") 
+```
+
+
+So the difference start the minute of the transition from the constraint to free running. 
+
+What are the things that could be affecting it.... 
+
+* beta is off 
+* inputs are off 
+* is something up with the equation?? 
+
+
+# Beta
+
+## Beta when CO~2~ is free running 
+
+What happens when we try to fit the beta parameter? Does that improve the difference? If so by how much? 
+
+```{r}
+# Start by extracting the historic CO2 concentration, 
+# this is going to the be the values that we are fitting to. 
+file <- list.files(system.file("input/tables", package = "hector"), 
+                    pattern = "emiss-constraints_rf",  full.names = TRUE)[1]
+data <- read.csv(file, comment.char = ";") %>% 
+  dplyr::filter(Date %in% 1750:2015)
+comp_data <- data.frame(year = data$Date, 
+                        value = data$CO2_constrain, 
+                        variable = ATMOSPHERIC_CO2())
+```  
+
+```{r}
+ini <- system.file("input/hector_ssp370.ini", package = "hector")
+core <- newcore(ini)
+
+# Function that resets beta and calculates the MSE compared to the output date
+# Arg 
+#   beta: the beta parameter value 
+# return: MSE between our comparison data and Hector
+beta_hector_error <- function(beta){
+  
+  out <- tryCatch({
+    setvar(core, dates = NA, var = BETA(), 
+           value = beta, unit = getunits(BETA()))
+    reset(core)
+    run(core, runtodate = 2015)
+    hector_data <- fetchvars(core, 1750:2015, vars = ATMOSPHERIC_CO2())
+    hector_data[c("year", "value", "variable")]}, 
+    error = function(error){data.frame(year = 1750:2015, 
+                                       value = 9999, 
+                                       variable = ATMOSPHERIC_CO2())})
+  
+  return(mean((out$value - comp_data$value)^2))
+  
+}
+
+# Solve for beta
+slv <- nleqslv::nleqslv(0.56, beta_hector_error, method="Broyden")
+```
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    core <- newcore(f, name = name)
+    setvar(core, NA, BETA(), slv$x, getunits(BETA()))
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "beta fit"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  beta_running
+```
+
+
+```{r}
+var <- ATMOSPHERIC_CO2()
+rbind(co2_driven, free_running_out, co2_driven_hist, beta_running) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+```{r}
+var <- GLOBAL_TEMP()
+rbind(co2_driven, free_running_out, co2_driven_hist, beta_running) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+```{r}
+var <- HEAT_FLUX()
+rbind(co2_driven, free_running_out, co2_driven_hist, beta_running) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+```{r}
+var <- NPP()
+rbind(co2_driven, free_running_out, co2_driven_hist, beta_running) %>% 
+  filter(variable == var) %>%  
+  ggplot(aes(year, value, color = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```
+
+## What about when historic CO2 is constrained and we are fitting on future conc
+
+```{r}
+# The historical constraint
+data_path <- system.file("input/tables/ssp245_emiss-constraints_rf.csv", package = "hector")
+constraint_data <- read.csv(data_path, comment.char = ";") %>% 
+  filter(Date %in% 1750:2015)
+
+# The comparison data, future CO2 concentrations
+system.file("input/tables", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "_emiss-constraints_rf.csv") %>% 
+  lapply(function(f){
+    name <- gsub(pattern = "_emiss-constraints_rf.csv", replacement = "",basename(f))
+    data <- read.csv(f, comment.char = ';')
+    df <- data.frame(year = data$Date, 
+                     scenario = name, 
+                     value = data$CO2_constrain)
+    return(df)
+  }) %>% 
+  do.call(what = "rbind") %>%  
+  filter(year %in% 2015:2100) -> 
+  comp_data
+
+
+# Set up a list of Hector cores 
+system.file("input", package= "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    name <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "" )
+    core <- newcore(f, name = name, suppresslogging = TRUE)
+    setvar(core, 
+           dates = constraint_data$Date, 
+           var = CO2_CONSTRAIN(), 
+           values = constraint_data$CO2_constrain, 
+           unit = getunits(CO2_CONSTRAIN()))
+    return(core)
+  }) -> 
+  hcore_list
+
+# Calculate the MSE between Hector results & the future CO2 concentrations 
+# For all the scenarios. 
+# Args 
+#   beta: numeric value for beta, note that this function does depend on a number of objects 
+#          already existing (poor closure on my part)
+# Return: numeric values indicating the MSE between Hector output and the comparison data. 
+hector_beta_all_scns_MSE <- function(beta){
+  
+  lapply(hcore_list, function(core){
+    
+    tryCatch({
+      setvar(core, dates = NA, var = BETA(), 
+             value = beta, unit = getunits(BETA()))
+      reset(core)
+      run(core, runtodate = 2100)
+      hector_data <- fetchvars(core, comp_data$year, vars = ATMOSPHERIC_CO2())
+      hector_data[c("scenario", "year", "value", "variable")]
+      
+    }, 
+    error = function(error){data.frame(scenario = core$name, 
+                                       year = comp_data$year, 
+                                       value = 9999, 
+                                       variable = ATMOSPHERIC_CO2())}) 
+    
+  }) %>%  
+    do.call(what = "rbind") %>%  
+    rename(new_value = value) -> 
+    hector_results
+  
+  hector_results %>%  
+    inner_join(comp_data, by = c("scenario", "year")) %>% 
+    mutate(SE = (new_value - value) ^2) %>% 
+    group_by(scenario) %>% 
+    summarise(MSE = mean(SE)) %>% 
+    ungroup %>% 
+    pull(MSE) %>% 
+    mean() -> 
+    out 
+     
+  return(out)
+  
+}
+```
+
+
+
+```{r}
+# Solve for beta
+slv_fut <- nleqslv::nleqslv(0.90, hector_beta_all_scns_MSE, method="Broyden")
+```
+
+
+```{r}
+
+hcore_list %>%  
+  lapply(function(core){
+    setvar(core, NA, BETA(), slv_fut$x, getunits(BETA()))
+    reset(core)
+    run(core)
+    out <- fetchvars(core, 1850:2100, vars = vars)
+    out$type <- "beta fit fut"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  beta_fit_future_results
+```
+
+
+
+```{r}
+var <- NPP()
+rbind(co2_driven, free_running_out, co2_driven_hist, beta_running, beta_fit_future_results) %>%
+  filter(variable == var) %>%  
+ # filter(year %in% 1750:1950) %>%  
+  ggplot(aes(year, value, color = type, linetype = type)) + 
+  geom_line() + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(title = var)
+```

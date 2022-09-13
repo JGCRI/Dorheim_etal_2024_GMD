@@ -1,0 +1,650 @@
+---
+title: "Emission Driven Hector"
+output:
+  html_notebook:
+    toc: yes
+    toc_depth: '4'
+    toc_float: yes
+    number_sections: true
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+# Set Up 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, error = FALSE, message = FALSE)
+# see https://bookdown.org/yihui/rmarkdown-cookbook/ for more info on markdowns
+```
+
+```{r}
+library(data.table)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+remotes::install_github("JGCRI/hector@land_tracking")
+library(hector)
+
+BASE_DIR <- here::here()
+
+theme_set(theme_bw())
+```
+
+## Objective 
+
+Here we want to check to see how much of a difference does emission driven Hector vs CO2 constrained Hector makes. 
+
+* Does it matter for Hector output? If so by how much? For what variables? 
+* How does constraining CO~2~ effect Hector vs obs comparisons? (to the extent that constraining CO2 makes an impact)
+
+# Emission vs [CO~2~] driven Hector
+
+```{r}
+yrs <- 1850:2100 
+vars <- c(GLOBAL_TEMP(), ATMOSPHERIC_CO2(), NPP(), HEAT_FLUX(), 
+          OCEAN_CFLUX(), LAND_AIR_TEMP(), OCEAN_SURFACE_TEMP())
+
+```
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    core <- newcore(f, name = name)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "emission driven"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  free_running_out
+```
+
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    scn_name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    name <- paste0(scn_name)
+    
+    data_path <- list.files( system.file("input/tables", package = "hector"), pattern = scn_name, full.names = TRUE)
+    data <- read.csv(data_path, comment.char = ";")
+    
+    core <- newcore(f, name = name)
+    setvar(core, data$Date, var = CO2_CONSTRAIN(), values = data$CO2_constrain, unit = getunits(CO2_CONSTRAIN()))
+    reset(core)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "[co2] driven"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  co2_driven
+```
+
+```{r}
+system.file("input", package = "hector") %>% 
+  list.files(full.names = TRUE, pattern = "ini") %>% 
+  lapply(function(f){
+    scn_name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    name <- paste0(scn_name)
+    
+    data_path <- list.files( system.file("input/tables", package = "hector"), pattern = scn_name, full.names = TRUE)
+    data <- read.csv(data_path, comment.char = ";") %>% 
+      filter(Date <= 1959)
+    
+    core <- newcore(f, name = name)
+    setvar(core, data$Date, var = CO2_CONSTRAIN(), values = data$CO2_constrain, unit = getunits(CO2_CONSTRAIN()))
+    reset(core)
+    run(core)
+    out <- fetchvars(core, yrs, vars)
+    out$type <- "[co2] driven hist until obs record"
+    return(out)
+  }) %>% 
+  do.call(what = "rbind") -> 
+  co2_driven_hist
+```
+
+```{r}
+BASE_DIR <- here::here()
+COMPARISON_DIR <- file.path(BASE_DIR, "data", "comparison")
+
+obs <- read.csv(file.path(COMPARISON_DIR, "monthly_in_situ_co2_mlo.csv"), stringsAsFactors = FALSE, skip = 57)
+names(obs) <- c("year", "month", "date", "date", "x", "x", "x", "x", "x", "value")
+obs %>% 
+  select(year, month, value) %>% 
+  filter(value != -99.99) %>% 
+  filter(year %in% 1959:2021) %>% 
+  group_by(year) %>% 
+  summarise(value = mean(value)) %>% 
+  ungroup -> 
+  obs_data
+
+
+```
+
+
+```{r}
+rbind(co2_driven_hist, free_running_out, co2_driven) %>% 
+  filter(scenario == "ssp245") %>% 
+  filter(variable == "Ca") -> 
+  hector_ca_to_plot
+
+hector_ca_to_plot %>% 
+  filter(year >= 1940) %>% 
+  ggplot() + 
+  geom_line(aes(year, value, color = type)) + 
+  geom_point(data = obs_data, aes(year, value), size = 1) + 
+  labs(title = "[CO2] Hector vs. Obs") 
+```
+
+
+
+
+```{r}
+comp_long <- rbind(free_running_out, co2_driven)
+```
+## Comparison Plots 
+
+```{r}
+# Generate a comparison of the Hector output data 
+# 
+# Args 
+#   df: data frame, long of emission and concentration driven Hector 
+#   var: string, name of the variable to plot 
+#   yrs: numeric vector, the years to include in the plot, default includes 1850 to 2100
+plot_comp_data <- function(df, var, yrs = 1850:2100){
+  
+  df %>% 
+    filter(variable == var) %>% 
+    filter(year %in% yrs) %>% 
+    ggplot(aes(year, value, color = type)) + 
+    geom_line() + 
+    facet_wrap("scenario", scales = "free") + 
+    labs(title = var, y = NULL, x = NULL) 
+}
+
+```
+
+
+
+```{r}
+plot_comp_data(df = comp_long, ATMOSPHERIC_CO2())
+```
+
+
+
+```{r}
+plot_comp_data(df = comp_long, GLOBAL_TEMP())
+```
+
+```{r}
+plot_comp_data(df = comp_long, NPP())
+```
+
+
+```{r}
+plot_comp_data(df = comp_long, HEAT_FLUX())
+```
+
+```{r}
+plot_comp_data(df = comp_long, OCEAN_CFLUX())
+```
+
+## Numeric Comparison 
+
+What is the percent difference between the co2 driven and emission driven for the diffferent scenarios & variables, we will start the historical period... 
+
+
+```{r}
+comp_long %>% 
+  filter(scenario == "ssp119" & year <= 2014) %>% 
+  mutate(scenario = "historical") %>% 
+  select(scenario, year, variable, value, type) %>% 
+  spread(type, value) %>% 
+  mutate(diff = 100 * signif(`[co2] driven` - `emission driven`, 3) / signif(`[co2] driven`, 3)) -> 
+  hist_comp_wide
+```
+
+```{r}
+hist_comp_wide %>% 
+  group_by(variable) %>% 
+  summarise(min = min(diff), 
+            mean = mean(diff), 
+            max = max(diff)) 
+```
+
+What about the future scenarios ? 
+
+```{r}
+comp_long %>% 
+  filter(year >= 2014) %>% 
+  select(scenario, year, variable, value, type) %>% 
+  spread(type, value) %>% 
+  mutate(diff = 100 * signif(`[co2] driven` - `emission driven`, 3) / signif(`[co2] driven`, 3)) -> 
+  future_comp_wide
+```
+
+```{r}
+future_comp_wide %>% 
+  group_by(scenario, variable) %>% 
+  summarise(min = min(diff), 
+            mean = mean(diff), 
+            max = max(diff)) %>% 
+  ungroup() -> 
+  future_comp_summary
+
+
+future_comp_summary %>% 
+  filter(variable == ATMOSPHERIC_CO2())
+```
+
+```{r}
+# Plot the min/max/mean of the percent difference between free running and concentration driven Hector 
+plot_summary_stats <- function(var){
+  future_comp_summary %>% 
+  filter(variable == var) %>% 
+  ggplot() + 
+  geom_point(aes(scenario, min)) + 
+  geom_point(aes(scenario, max)) + 
+  geom_point(aes(scenario, mean, color = "mean"), size = 2) + 
+  labs(y = "% Difference", 
+       title = var)
+}
+```
+
+
+
+
+
+```{r}
+plot_summary_stats(ATMOSPHERIC_CO2())
+```
+
+
+```{r}
+plot_summary_stats(GLOBAL_TEMP())
+```
+
+
+```{r}
+plot_summary_stats(NPP())
+```
+
+
+```{r}
+#plot_summary_stats(NBP())
+```
+
+
+```{r}
+plot_summary_stats(OCEAN_CFLUX())
+```
+
+
+# How do the Hector results compare with comparison data? 
+
+```{r}
+
+tas_global <- read.csv(file.path(BASE_DIR, "data", "comparison", "CMIP6", "cmip6_annual_tas_global.csv"), 
+                       stringsAsFactors = FALSE)
+
+tas_global %>% 
+  dplyr::filter(experiment %in% c("ssp126", "ssp245", "ssp370",  
+                                "ssp585", "ssp119" , "ssp434", "ssp460")) %>% 
+  dplyr::mutate(scenario = experiment) %>% 
+  select(model, scenario, ensemble, variable, value = Tgav, year) %>% 
+  mutate(variable = GLOBAL_TEMP()) %>% 
+  group_by(model, scenario, year) %>% 
+  summarise(value = mean(value)) %>% 
+  ungroup() %>% 
+  filter(year <= 2100) -> 
+  cmip6_tas
+```
+
+## Historical obs 
+
+```{r}
+here::here("data", "comparison", "HadCRUT.5", "HadCRUT.5.0.1.0.analysis.summary_series.global.annual.csv") %>% 
+  read.csv(stringsAsFactors = FALSE) -> 
+  data
+names(data) <- c("year", "value", "lower", "upper")
+
+comp_long %>% 
+  filter(scenario == "ssp119" & year <= 2015) %>% 
+  mutate(scenario = "historical") %>% 
+  filter(variable %in% c(LAND_AIR_TEMP(), OCEAN_SURFACE_TEMP())) -> 
+  land_sst_temps
+
+get_gmst <- function(data){
+  flnd <- 0.29
+  
+  land_air <- data[data$variable == LAND_AIR_TEMP(), ]
+  tos <- data[data$variable == OCEAN_SURFACE_TEMP(), ]
+  gmst_vals <- land_air$value *  flnd + tos$value * (1 - flnd)
+  
+  data$value <- gmst_vals
+  data$variable <- "GMST"
+  
+  ref_value <- mean(data[data$year %in% 1961:1990, ][["value"]])
+  data$value <- data$value - ref_value
+  
+  return(data)
+
+} 
+
+rbind(land_sst_temps %>% 
+  filter(type == "emission driven") %>%  
+  get_gmst, 
+  land_sst_temps %>% 
+  filter(type != "emission driven") %>%  
+  get_gmst) -> 
+  hector_gmst
+
+
+ggplot() + 
+  geom_ribbon(data = data, aes(x = year, ymin = lower, ymax = upper), alpha = 0.4) + 
+  geom_line(data = data, aes(x = year, y = value), size = 1) + 
+  geom_line(data = hector_gmst, aes(x = year, y = value, color = type), size = 1.5) + 
+  labs(y = "deg C", x = NULL, 
+       title = "HadCRUT vs Hector")
+
+
+```
+
+## CMIP6 TAS
+
+```{r}
+comp_long %>% 
+  filter(variable == GLOBAL_TEMP()) %>% 
+  filter(year >= 2015) -> 
+  hector_tas 
+
+ggplot() + 
+  geom_line(data = cmip6_tas, aes(year, value, group = model, color = "CMIP6"), alpha = 0.7, color = "grey") + 
+  geom_line(data = hector_tas, aes(year, value, color = type)) + 
+  facet_wrap("scenario", scales = "free") + 
+  labs(x = NULL, y = NULL, title = "global tas")
+```
+
+## Land tas
+
+The CMIP6 tas values are not in the correct units 
+
+
+## TOS 
+
+
+```{r}
+COMPARISON_DIR <- file.path(BASE_DIR, "data", "comparison")
+
+cmip6_tos <- read.csv(file.path(COMPARISON_DIR, "CMIP6", "cmip6_annual_tos.csv"), stringsAsFactors = FALSE) %>% 
+  rename(scenario = experiment) %>% 
+  filter(year <= 2100)
+
+cmip6_tos %>% 
+  group_by(scenario, year) %>% 
+  dplyr::summarise(tos_mean = mean(value), 
+                   tos_min = min(value), 
+                   tos_max = max(value)) %>% 
+  ungroup() %>% 
+  mutate(scenario = if_else(year <= 2019, "ssp119", scenario)) -> 
+  cmip6_tos
+```
+
+```{r}
+
+comp_long %>% 
+  filter(variable == OCEAN_SURFACE_TEMP()) %>% 
+  filter(year >= 2015) -> 
+  hector_tos 
+
+
+ggplot() + 
+  geom_ribbon(data = cmip6_tos, aes(year, ymin = tos_min, ymax = tos_max, group = scenario), 
+              alpha = 0.3) +
+  geom_line(data = cmip6_tos, aes(year, tos_mean, group = scenario), alpha = 0.3) +
+  geom_line(data = hector_tos, aes(year, value, color = type, 
+                                  group = interaction(scenario, type))) + 
+  facet_wrap("scenario", scales = "free")  + 
+  labs(y = NULL, x = NULL, title = "TOS")
+```
+
+## NPP 
+
+```{r}
+npp_cmip6 <- read.csv(here::here(COMPARISON_DIR, "CMIP6", "CMIP6_annual_npp_land.csv")) %>% 
+  filter(year %in% 2015:2100) %>% 
+  group_by(model, experiment, variable, year) %>% 
+  summarise(value = mean(value)) %>% 
+  ungroup() %>% 
+  rename(scenario = experiment)
+
+comp_long %>% 
+  filter(variable == NPP()) %>% 
+  filter(year >= 2015) ->
+  hector_npp
+```
+
+```{r}
+npp_cmip6 %>%  
+  ggplot() + 
+  geom_line(aes(year, value, color = model, linetype = scenario)) + 
+  labs(title = "CMIP6 NPP")
+```
+
+```{r}
+ggplot() + 
+  geom_line(data = npp_cmip6, aes(year, value, group = model, color = "CMIP6"), alpha = 0.7, color = "grey") + 
+  geom_line(data = hector_npp, aes(year, value, color = type)) + 
+  facet_wrap("scenario") + 
+  labs(x = NULL, y = NULL, title = "npp")
+```
+
+## Rh 
+
+```{r}
+cmip6_rh <- read.csv(here::here(COMPARISON_DIR, "CMIP6", "CMIP6_annual_rh_land.csv")) %>% 
+  filter(year %in% 2015:2100) %>% 
+  filter(experiment %in% c("ssp245", "ssp585", "ssp126", "ssp370")) %>% 
+  rename(scenario = experiment)
+
+comp_long %>% 
+  filter(variable == NPP()) %>% 
+  filter(year >= 2015) %>%  
+  filter(scenario %in% c("ssp245", "ssp585", "ssp126", "ssp370")) ->
+
+  hector_rh
+
+ggplot() + 
+  geom_line(data = cmip6_rh, aes(year, value, group = model, color = "CMIP6"), alpha = 0.7, color = "grey") + 
+  geom_line(data = hector_rh, aes(year, value, color = type)) + 
+  facet_wrap("scenario") + 
+  labs(x = NULL, y = NULL, title = "Rh")
+```
+
+
+
+
+# Okay did one of the fluxes really change between the RCPs? 
+
+Okay great so the atmospheric CO2 is the same when running with constraints, we do see some difference in the free running which means that there is some change in the carbon cycle based on our changes... which is not surprising... 
+
+
+```{r}
+rbind(read.csv(file.path(BASE_DIR, "data", "hector_comp_v25.csv")), 
+      read.csv(file.path(BASE_DIR, "data", "hector_comp_v3.csv"))) %>% 
+  filter(scenario %in% c("rcp26_constrained", "rcp26", "rcp60_constrained", "rcp60", "rcp85_constrained", "rcp85")) ->
+  hector_versions
+```
+
+```{r}
+hector_versions %>% 
+  filter(variable == ATMOSPHERIC_CO2()) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+```{r}
+hector_versions %>% 
+  filter(variable == RF_CO2()) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+```{r}
+hector_versions %>% 
+ # filter(year <= 1850) %>% 
+  filter(variable == RF_TOTAL()) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+In both versions we see this largish off set between free running Hector & concentration driven Hector so atleast this is not a v3 devlopment that is driving this difference... 
+
+```{r}
+hector_versions %>% 
+  filter(variable == ATMOSPHERIC_CO2()) %>% 
+  ggplot(aes(year, value, color = scenario)) + 
+  geom_line() + 
+  facet_wrap("version") 
+```
+
+
+The ocean sink increased between v 2.5 and v 3 
+
+
+```{r}
+hector_versions %>% 
+  filter(variable == "atm_ocean_flux") %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+
+```{r}
+hector_versions %>% 
+  filter(variable %in% c("atm_land_flux", "NBP")) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+
+```{r}
+hector_versions %>% 
+  filter(variable == GLOBAL_TEMP()) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+```{r}
+hector_versions %>% 
+  filter(variable == NPP()) %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+```{r}
+hector_versions %>% 
+  filter(variable ==  "heatflux") %>% 
+  ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+
+
+
+How do the aerosol RF values differ from one another? 
+```{r}
+areosol_var_names <- c("FSO2", "FOC", "FBC", "Faci", "FNH3")
+hector_versions %>%  
+  filter(variable %in% areosol_var_names) %>% 
+  group_by(scenario, year, version) %>% 
+  summarise(value = sum(value)) %>%  
+  ungroup -> 
+  hector_areosol_RF
+
+hector_areosol_RF %>% 
+    ggplot(aes(year, value, color = version, linetype = version)) + 
+  geom_line() + 
+  facet_wrap("scenario") 
+```
+
+
+```{r}
+hector_versions %>% 
+  filter(variable == RF_TOTAL()) %>% 
+  select(scenario, year, variable, value, version) %>%  
+  spread(version, value) %>% 
+  mutate(abs_dif = abs(`3.0.0` - `2.5.0`)) %>% 
+  pull(abs_dif) %>%  summary()
+```
+
+
+```{r}
+hector_areosol_RF %>% 
+  spread(version, value) %>% 
+  mutate(abs_dif = abs(`3.0.0` - `2.5.0`)) %>% 
+  pull(abs_dif) %>%  summary()
+```
+
+```{r}
+hector_versions %>% 
+  filter(version == "3.0.0") %>% 
+  mutate(driven = if_else(grepl(pattern = "_constrained", x = scenario), 
+                          "[co2]", "emiss")) %>% 
+  mutate(scenario = gsub(pattern = "_constrained", replacement = "", x = scenario)) -> 
+  hectorv3_driven
+```
+
+
+```{r}
+var <- "Ca"
+hectorv3_driven %>% 
+  filter(year > 1950) %>%  
+  filter(variable == var) %>% 
+  ggplot(aes(year, value, color = scenario, linetype = driven)) + 
+  geom_line() + 
+  labs(title = var)
+```
+
+```{r}
+var <- "NBP"
+hectorv3_driven %>% 
+  filter(year > 1850) %>%  
+  filter(variable == var) %>% 
+  ggplot(aes(year, value, color = scenario, linetype = driven)) + 
+  geom_line() + 
+  labs(title = var)
+```
+
+```{r}
+var <- "atm_ocean_flux"
+hectorv3_driven %>% 
+  filter(year > 1850) %>%  
+  filter(variable == var) %>% 
+  ggplot(aes(year, value, color = scenario, linetype = driven)) + 
+  geom_line() + 
+  labs(title = var)
+```
+
+```{r}
+hector_versions %>% 
+  filter(version == "3.0.0") %>% 
+  filter(variable == OCEAN_CFLUX()) %>% 
+  ggplot(aes(year, value, color = scenario)) + 
+  geom_line()
+```
+
+
+
+
