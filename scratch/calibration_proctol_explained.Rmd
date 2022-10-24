@@ -1,0 +1,124 @@
+---
+title: "Devloping the Hector v3 default calibration protocol"
+output: html_notebook
+---
+
+The purpose of this note book is to document how we came to decide the protocol for the Hector v3 calibration protocol. Because there have been a number of attempts at and piles of code & figures trying to address this notebook will only contain the critical results that led to our decision. 
+
+
+```{r, warning=FALSE, message=FALSE}
+# Load the required packages. 
+library(assertthat)
+library(dplyr)
+library(FME)
+library(GGally)
+library(ggplot2)
+library(magrittr)
+library(tidyr)
+
+# While not the most stable way of loading Hector right now we need to make sure that the v3 
+# branch is the one that is going to be used here!
+HECTOR_BASE <- "/Users/dorh012/projects/Hector-Versions/luc/hector"
+devtools::load_all(HECTOR_BASE)
+
+# Vis setting
+theme_set(theme_bw())
+```
+
+
+# npp_flux0 is fixed from litterature!
+
+The decision to fix `npp_flux0` at a set value from the literature comes from the fact that while NPP is sensitive to changes in this parameter value other Hector variables are not that sensitive to it. 
+
+
+How does changing npp_flux0 affect Hector output?
+
+```{r, message=FALSE, waring=FALSE}
+# Set up 3 Hector cores each with one low, med, and high NPP0 this is to test 
+# interactions between NPP0 and Hector variables. 
+# Ito et al. 2011 - doi: 10.1111/j.1365-2486.2011.02450.x
+# reports a range of 56.2±14.3 so this will be the range of the values we use in this. 
+ini <- file.path(HECTOR_BASE, "inst", "input", "hector_ssp245.ini")
+core_245_low <- newcore(ini, name = "ssp245 low")
+setvar(core = core_245_low, dates = NA, var = NPP_FLUX0(), values = 41.9, unit = "Pg C/yr")
+reset(core_245_low)
+
+core_245_mid <- newcore(ini, name = "ssp245 mid")
+setvar(core = core_245_mid, dates = NA, var = NPP_FLUX0(), values = 56.2, unit = "Pg C/yr")
+reset(core_245_mid)
+
+core_245_high <- newcore(ini, name = "ssp245 high")
+setvar(core = core_245_high, dates = NA, var = NPP_FLUX0(), values = 70.5, unit = "Pg C/yr")
+reset(core_245_high)
+
+# Run Hector! 
+run(core_245_low)
+run(core_245_mid)
+run(core_245_high)
+
+# Extract and save the results 
+dates <- 1850:2300
+vars <- c(NPP(), NBP(), GLOBAL_TAS(), OCEAN_UPTAKE(), CONCENTRATIONS_CO2())
+npp0_lmh <- rbind(fetchvars(core_245_low, dates, vars), 
+                  fetchvars(core_245_mid, dates, vars),
+                  fetchvars(core_245_high, dates, vars))
+```
+
+
+```{r}
+npp0_lmh %>% 
+  filter(year <= 2020) %>% 
+  ggplot() + 
+  geom_line(aes(year, value, color = scenario)) + 
+  facet_wrap("variable", scales = "free") + 
+  labs(title = "Historcal Hector output at low, medium, and high NPP0", x = NULL, y = NULL)
+```
+
+```{r}
+npp0_lmh %>% 
+  filter(year >= 2020) %>% 
+  ggplot() + 
+  geom_line(aes(year, value, color = scenario)) + 
+  facet_wrap("variable", scales = "free") + 
+  labs(title = "Future Hector output at low, medium, and high NPP0", x = NULL, y = NULL)
+```
+```{r}
+npp0_lmh %>% 
+ # filter(year >= 2020) %>% 
+  ggplot() + 
+  geom_line(aes(year, value, color = scenario)) + 
+  facet_wrap("variable", scales = "free") + 
+  labs(title = "Hector output at low, medium, and high NPP0", x = NULL, y = NULL)
+```
+
+Therefore we decided to leave NPP as a value fixed from the literature. 
+
+
+# ECS is fixed from the litterature! 
+
+Our thinking here is that for default Hector we should use the best scientific consensus aka the value from the IPCC AR6 report. When using Hector as an emulator for specific ESMs models this is key tune-able parameter that would need to be adjusted for Hector to act as an emulator. 
+
+# Alpha & Volscl are fixed 
+
+Once again Hector models aerosol radiative forcing and uses the prescribed volcanic radiative forcing that contributes fully to Hector's global temperature calculation. This is more of an adjustable parameter to account for uncertainty in volcanic and aerosol radiative forcing. We explored the idea of fitting alpha and volscl however but allowing those parameters to be free did not improve the fits. Therefore we set those to be fixed values. 
+
+# Final Calibraiton Protocol 
+
+Ocean heat diffusion, heterotrophic respiration, and beta are free parameters to be solved with the optimizer.
+
+Comparison data used 
+
+* global mean surface temperature, NASA GISS 
+* NOAA atmospheric CO2 concentrations 
+* Global Carbon Project land flux 
+
+Used the normalized mean squared error so that the three variables have equal weight contributing the goodness of fit. 
+
+Some helpful plots 
+
+* goodness of fix vs parameter fits 
+* fixing different parameter values and seeing how the fits can change 
+
+
+
+
