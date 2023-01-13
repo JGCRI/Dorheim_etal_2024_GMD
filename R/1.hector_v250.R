@@ -62,19 +62,3 @@ rstls$version <- version
 
 file <- paste0("hector_", version, "_rcp.csv")
 write.csv(rstls, file = file.path(BASE_DIR, "output", "hector_output", file), row.names = FALSE)
-
-
-
-# Run Hector with the RF constraint ------------------------------------------------------------------
-rf_total <- read.csv(here::here("hectorv3_1pctCO2_rf.csv"))
-
-ini <- list.files(file.path(HECTOR_DIR, "inst", "input"), "1pctCO2-again.ini", full.names = TRUE)
-hc <- newcore(ini)
-run(hc)
-fetchvars(hc, 1745:2100, vars = c(RF_TOTAL(), GLOBAL_TEMP())) %>%  
-  mutate(scenario = "1pctCO2") %>%  
-  mutate(model = "hector") %>% 
-  mutate(source = "v25 RF tot constrained") -> 
-  out
-
-write.csv(out, row.names = FALSE, file = "v25_rf_constrianted.csv")
