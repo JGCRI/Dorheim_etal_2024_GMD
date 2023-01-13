@@ -1,7 +1,8 @@
 # Objective: Download the v2.3.0 run Hector and format results so that they have the proper names 
 # to plot with the Hector v3 output data. 
 # 0. Set Up --------------------------------------------------------------------------------
-devtools::install_github("jgcri/hector@v2.3.0")
+remove.packages("hector")
+devtools::install_github("jgcri/hector@v2.3.0", force = TRUE)
 library(dplyr)
 library(hector)
 
@@ -44,5 +45,5 @@ version <- packageVersion(pkg = "hector")
 rstls$version <- version
 
 file <- paste0("hector_", version, "_rcp.csv")
-write.csv(rstls, file = file.path(BASE_DIR, "hector_output", file), row.names = FALSE)
+write.csv(rstls, file = file.path(BASE_DIR, "output", "hector_output", file), row.names = FALSE)
 

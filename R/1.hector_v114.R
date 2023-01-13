@@ -77,4 +77,4 @@ list.files(file.path(dirname(dest_file), "JGCRI-hector-ec9af49", "input"), patte
 
 rstls <- rbind(output, params_table)
 file <- paste0("hector_", version, "_rcp.csv")
-write.csv(rstls, file = file.path(BASE_DIR, "hector_output", file), row.names = FALSE)  
+write.csv(rstls, file = file.path(BASE_DIR, "output", "hector_output", file), row.names = FALSE)  
