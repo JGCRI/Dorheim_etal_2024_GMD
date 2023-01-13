@@ -54,4 +54,24 @@ normalize_hector_temp <- function(data, period){
     data
   
   return(data)
+  
+}
+
+# Read parameter values into an active Hector core 
+# Args 
+#   core: active hector core 
+#   p: vector of named hector parameter values  
+# Return active hector core with the set parameter values 
+set_params <- function(core, p){
+  
+  assert_that(all(is.character(names(p))), msg = "unamed parameter")
+  
+  mapply(function(pval, pnames, punits){
+    setvar(core, dates = NA, values = pval, var = pnames, unit = punits)
+  }, pval = p, pnames = names(p), punits = getunits(names(p)))
+  
+  reset(core)
+  
+  return(core)
+  
 }
