@@ -1,10 +1,12 @@
 # Objective: Download the v2.3.0 run Hector and format results so that they have the proper names 
 # to plot with the Hector v3 output data. 
 # 0. Set Up --------------------------------------------------------------------------------
-devtools::install_github("jgcri/hector@62381e7")
+#devtools::install_github("jgcri/hector@62381e7", force = TRUE)
+HECTOR_DIR <- "~/projects/Hector-Versions/v2/hector"
+devtools::load_all(HECTOR_DIR)
 library(dplyr)
 library(hector)
-
+source(file.path("R", "0B.functions.R"))
 assertthat::assert_that(packageVersion(pkg = "hector") == "2.5.0")
 
 BASE_DIR <- here::here()
@@ -17,14 +19,28 @@ vars <- c(ATMOSPHERIC_CO2(), GLOBAL_TEMP(), HEAT_FLUX(), RF_TOTAL(), RF_T_ALBEDO
 params <- c(ECS(), DIFFUSIVITY(), AERO_SCALE(), VOLCANIC_SCALE(), BETA(), Q10_RH())
 
 # Run Hector, fetch output and format. 
-list.files(system.file("input", package = "hector"), pattern = "rcp", full.names = TRUE) %>%
+list.files(file.path(HECTOR_DIR, "inst", "input"), pattern = "rcp", full.names = TRUE) %>%
   lapply(function(f){
     name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
     core <- newcore(f, name = name)
     run(core)
     out1 <- fetchvars(core, dates = yrs, vars = vars)
     out2 <- fetchvars(core, dates = NA, vars = params)
-    out <- rbind(out1, out2)
+    
+    flnd <- 0.29
+    fetchvars(core, dates = yrs, vars = c("Tgav_land", "Tgav_ocean_ST")) %>% 
+      select(year, variable, value) -> 
+      output
+    
+    output <- reshape(output, direction = "wide", idvar = "year", timevar = "variable")
+    names(output) <- gsub("value.", "", names(output))
+    
+    output$value <- with(output, (Tgav_land * flnd + Tgav_ocean_ST * (1 - flnd)))
+    output <- subset(output, select = c(year, value))
+    output$variable <- "gmst"
+    output$scenario <- unique(out2$scenario)
+    output$units <- "deg C"
+    out <- rbind(out1, out2, output)
     return(out)
   }) %>%
   do.call(what = "rbind") ->
@@ -45,5 +61,20 @@ version <- packageVersion(pkg = "hector")
 rstls$version <- version
 
 file <- paste0("hector_", version, "_rcp.csv")
-write.csv(rstls, file = file.path(BASE_DIR, "hector_output", file), row.names = FALSE)
+write.csv(rstls, file = file.path(BASE_DIR, "output", "hector_output", file), row.names = FALSE)
 
+
+
+# Run Hector with the RF constraint ------------------------------------------------------------------
+rf_total <- read.csv(here::here("hectorv3_1pctCO2_rf.csv"))
+
+ini <- list.files(file.path(HECTOR_DIR, "inst", "input"), "1pctCO2-again.ini", full.names = TRUE)
+hc <- newcore(ini)
+run(hc)
+fetchvars(hc, 1745:2100, vars = c(RF_TOTAL(), GLOBAL_TEMP())) %>%  
+  mutate(scenario = "1pctCO2") %>%  
+  mutate(model = "hector") %>% 
+  mutate(source = "v25 RF tot constrained") -> 
+  out
+
+write.csv(out, row.names = FALSE, file = "v25_rf_constrianted.csv")
