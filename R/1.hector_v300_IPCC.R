@@ -1,5 +1,6 @@
 # Objective: Import and format the IPCC results to simplify the manuscript analyses and figures 
-# code. 
+# code. Because the IPCC report and Hector default scenarios used different historical LUC 
+# emissions in this script we have to back engineer these emissions to use in Hector.
 # 0. Set Up ----------------------------------------------------------------------------
 library(dplyr)
 library(ggplot2)
@@ -271,6 +272,7 @@ split(hector_annual_co2_emissions, hector_annual_co2_emissions$scenario) %>%
   do.call(what = "rbind") -> 
   hector_cumsum_co2
 
+
 # Make sure the historical results are for the period 1850:2020 and that the future 
 # results are only for the 2015 to 2050 period. 
 hector_cumsum_co2 %>% 
@@ -288,6 +290,14 @@ rbind(hist_cumsum_co2,
   rename(co2 = value) %>% 
   select(year, scenario, co2) -> 
 final_hector_cumsum_co2 
+
+
+final_hector_cumsum_co2 %>% 
+  ggplot(aes(year, co2)) + 
+  geom_point()
+
+
+
 
 
 # Normalize the Hector temperature results to the reference period used in the figure of 
