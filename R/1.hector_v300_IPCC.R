@@ -12,10 +12,14 @@ library(hector)
 version <- packageVersion("hector")
 assertthat::assert_that(version == "3.0.0")
 
+# Loaf the calibration fits! 
+load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
+
 # The contents of the IPCC_DIR are the supplemental material figure 10 the cumulative CO2 
 # emissions vs global temperature change
 # https://data.ceda.ac.uk/badc/ar6_wg1/data/spm/spm_10/v20210809
 IPCC_DIR <- here::here("data", "IPCC_SPM10")
+
 
 # Load the IPCC tas vs co2 results 
 # 
@@ -69,6 +73,7 @@ read_IPCC_rslts <- function(f){
 }
 
 # 1. Process the IPCC data ----------------------------------------------------------------------------
+# Import and formt the IPCC results into a single data frame that for easy plotting and comparisons. 
 IPCC_rslts <- bind_rows(read_IPCC_rslts("Top_panel_HISTORY.csv"), 
                         read_IPCC_rslts("Top_panel_SSP1-19.csv"),
                         read_IPCC_rslts("Top_panel_SSP1-26.csv"),
@@ -83,7 +88,7 @@ write.csv(IPCC_rslts, file = here::here("data", "IPCC_co2_tas.csv"), row.names =
 # By the end of this section we will have the updated luc emissions for IPCC's historical period aka 1850 to 2019.
 
 # Start by loading the hector co2 emissions by year, scenario and emission type. 
-here::here("input", "tables") %>% 
+system.file("input/tables", package = "hector") %>% 
   list.files(pattern = "ssp119", full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(basename(f), pattern = "rcmip_|_emiss-constraints_rf.csv", replacement = "")
@@ -115,8 +120,10 @@ here::here("input", "tables") %>%
 
 # Resolving the differences between historical emissions. 
 # Calculate the total co2 emissions before figuring out the 
-# cumlative emissions. These two data frames will be used to 
-# compare IPCC and Hector emissions & caculate the difference between them. 
+# cumulative emissions. These two data frames will be used to 
+# compare IPCC and Hector emissions & calculate the difference between them. 
+#
+# Calculate the total co2 emissions (luc and ffi)
 hector_co2_emissions_by_variable %>% 
   filter(scenario == "historical") %>% 
   group_by(year) %>% 
@@ -124,6 +131,7 @@ hector_co2_emissions_by_variable %>%
   ungroup -> 
   hector_historical_co2
 
+# Get the cumulative co2 for the historical period.
 hector_historical_co2 %>% 
   filter(year >= 1850) %>% 
   mutate(value = cumsum(value)) -> 
@@ -138,11 +146,11 @@ IPCC_rslts %>%
   mutate(year = 1850:2019) -> 
   IPCC_hist_cumlative
 
-# Here is the difference in the cumlative emissions!
+# Here is the difference between the emissions!
 ggplot() + 
   geom_line(data = IPCC_hist_cumlative, aes(year, value, color = "IPCC")) + 
   geom_line(data = hector_historical_co2_cumlative, aes(year, value, color = "hector")) + 
-  labs(title = "Differnce in cumlative CO2 emissions between IPCC and Hector historical period")
+  labs(title = "The difference in IPCC and Hector cumlative CO2 emissions for the historical period")
 
 # Find the per year emissions time series for IPCC 
 # Differentiate to get the per year total co2 emissions of the historical IPCC time series.
@@ -174,22 +182,25 @@ hector_historical_co2 %>%
 hector_1745_lucemissions <- 0.0812
 hector_1850_luc_emissions <- 0.676
 
-early_history <- seq(from = hector_1745_lucemissions, to = hector_1850_luc_emissions, length.out = length(1745:1850))
+early_history <- seq(from = hector_1745_lucemissions, 
+                     to = hector_1850_luc_emissions, 
+                     length.out = length(1745:1850))
 
 new_hector_luc_hist[new_hector_luc_hist$year %in% 1745:1850, ]$value <- early_history
 
-
 # Compare the old and new LUC emissions inputs for Hector 
 ggplot() + 
-  geom_line(data = new_hector_luc_hist, aes(year, value, color = "new")) + 
-  geom_line(data = hector_luc_hist, aes(year, value, color = "of hector")) + 
+  geom_line(data = new_hector_luc_hist, aes(year, value, color = "new hector luc inputs")) + 
+  geom_line(data = hector_luc_hist, aes(year, value, color = "old hector luc inputs")) + 
   labs(title = "Old v New Hecotr historical luc inputs")
 
-here::here("input") %>% 
+# Set up and run Hector with the new LUC emission inputs
+system.file("input", package = "hector") %>% 
   list.files(pattern = "ssp119", full.names = TRUE) %>% 
   lapply(function(f){
-    scn <- gsub(x = basename(f), pattern = "rcmip_|.ini", replacement = "")
+    scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
     core <- newcore(inifile = f, name = "historical")
+    set_params(core, p = fit$par)
     setvar(core, dates = new_hector_luc_hist$year, var = LUC_EMISSIONS(), 
            values = new_hector_luc_hist$value, unit = "Pg C/yr")
     reset(core)
@@ -207,30 +218,21 @@ here::here("input") %>%
 
 
 # 3. Future results -----------------------------------------------------------------------------
-# By the end of this section we should have the hector results for the future scenarios, it will 
-# use the historical + future I think 
-
 # Based on the number of observations in the non historical IPCC data the output is from 2015 to 2050. 
 # And it looks like the first year the emissions differ from one another is in the year 2016 which is 
 # consistent with Hector's ssp scenarios too. 
-IPCC_rslts %>% 
-  filter(scenario != "historical") %>%
-  select(scenario, co2) %>% 
-  cbind(year = 2015:2050) %>% 
-  distinct %>% 
-  spread(scenario, co2)
-
 IPCC_scns <- paste0(unique(IPCC_rslts$scenario), collapse = "|")
 
 new_hector_luc_hist %>% 
   filter(year <= 2015) -> 
   hist_to_use_with_ssps
 
-here::here("input") %>% 
+system.file("input", package = "hector") %>% 
   list.files(pattern = IPCC_scns, full.names = TRUE) %>% 
   lapply(function(f){
-    scn <- gsub(x = basename(f), pattern = "rcmip_|.ini", replacement = "")
+    scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
     core <- newcore(inifile = f, name = scn)
+    set_params(core, p = fit$par)
     setvar(core, dates = hist_to_use_with_ssps$year, var = LUC_EMISSIONS(), 
            values = hist_to_use_with_ssps$value, unit = "Pg C/yr")
     reset(core)
@@ -248,7 +250,7 @@ here::here("input") %>%
 
 
 # 4. Format the Hector results ------------------------------------------------------------------------------------------------
-
+# Combine all of the new Hector results into a single data frame
 hector_rslts <- rbind(hector_IPCC_his_rslts, hector_IPCC_spp_rslts)
 
 # The total co2 emissions per year per Hector scenario. 
@@ -291,15 +293,6 @@ rbind(hist_cumsum_co2,
   select(year, scenario, co2) -> 
 final_hector_cumsum_co2 
 
-
-final_hector_cumsum_co2 %>% 
-  ggplot(aes(year, co2)) + 
-  geom_point()
-
-
-
-
-
 # Normalize the Hector temperature results to the reference period used in the figure of 
 # 1850:1900
 hector_rslts %>%
@@ -308,15 +301,8 @@ hector_rslts %>%
   select(year, scenario, gmst = value) -> 
   gmst_normalized
 
-hector_rslts %>%
-  filter(variable == GLOBAL_TAS()) %>% 
-  normalize_hector_temp(period = 1850:1900) %>%  
-  select(year, scenario, tas = value) -> 
-  tas_normalized
-
 final_hector_cumsum_co2 %>% 
-  inner_join(gmst_normalized, by = c("year", "scenario")) %>%  
-  inner_join(tas_normalized, by = c("year", "scenario")) -> 
+  inner_join(gmst_normalized, by = c("year", "scenario")) ->
   hector_co2_tas
 
 write.csv(hector_co2_tas, file = here::here("output", "hector_output", "hector_3.0.0-IPCCemiss_co2_tas.csv"), row.names = FALSE)

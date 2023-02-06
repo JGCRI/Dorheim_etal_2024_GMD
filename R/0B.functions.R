@@ -1,3 +1,5 @@
+library(assertthat)
+
 # Get gmst results from a Hector tun 
 # Args 
 #   core: active hector core

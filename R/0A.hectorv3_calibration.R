@@ -82,9 +82,7 @@ normalize_to_giss <- function(data){
 # Return: a Hector core with the set parameter values alpha = 1, ECS = 3 (IPCC result), volscl = 1, NPP0 = 56.2 (Ito et al)
 prep_core <- function(filename){
   # Set up the Hector core, make sure that the ECS is set equal to 3.0 
-  
-  #ini <- system.file(file.path("input", filename), package = "hector")
-  ini <- here::here("input", filename)
+  ini <- system.file(file.path("input", filename), package = "hector")
   core <- newcore(ini)
   setvar(core, dates = NA, var = ECS(), value = 3.0, unit = getunits(ECS()))
   setvar(core, dates = NA, var = NPP_FLUX0(), value = 56.2, unit = getunits(NPP_FLUX0()))
@@ -139,12 +137,12 @@ get_mse <- function(p, gmst_obs, co2_obs){
     
     # Make sure that the two boundary scenarios run, otherwise there could be issues if the parameter 
     # combination results in error conditions in the future. 
-    hc <- prep_core("rcmip_ssp119.ini")
+    hc <- prep_core("hector_ssp119.ini")
     set_params(hc, p)
     reset(hc)
     run(hc)
     
-    hc <- prep_core("rcmip_ssp585.ini")
+    hc <- prep_core("hector_ssp585.ini")
     set_params(hc, p)
     reset(hc)
     run(hc)
@@ -153,14 +151,16 @@ get_mse <- function(p, gmst_obs, co2_obs){
     hector_gmst <- normalize_to_giss(fetch_gmst(hc))
     hector_gmst <- hector_gmst[hector_gmst$year %in% gmst_obs$year, ]
     MSE_gmst <- mean((hector_gmst$value - gmst_obs$value)^2)
+    message("gmst: ", MSE_gmst)
     
     # Fetch the co2 results from the Hector core & calculate the normalized MSE. 
     hector_co2 <- fetchvars(hc, dates = co2_obs$year, vars = CONCENTRATIONS_CO2())
     MSE_co2 <-mean((hector_co2$value - co2_obs$value)^2)
+    message("co2: ", MSE_co2)
     
     # The goodness of fit is the mean of the normalized MSEs 
     MSEs <- c(MSE_gmst, MSE_co2)
-    
+    message("-----")
     return(mean(MSEs))
     
   }, error = function(e){
@@ -173,8 +173,9 @@ get_mse <- function(p, gmst_obs, co2_obs){
 }
 
 
-
 params <- c("diff" = 1, "q10_rh" = 2.2, "beta" = 0.23)
+get_mse(params, gmst_obs = gmst_obs_data,  co2_obs = co2_obs_data)
+
 fit <- optim(get_mse, 
              p = params,
              gmst_obs = gmst_obs_data,
@@ -185,11 +186,10 @@ save(fit, file = file.path(BASE_DIR, "output", paste0("calibration-", gsub(date(
 
 # 2. Quick Compare Fit Results with Obs -----------------------------------------------------------------------------
 # Set up, run, and fectch Hector results. 
-hc <- prep_core(filename = "rcmip_ssp119.ini")
+hc <- prep_core(filename = "hector_ssp119.ini")
 set_params(core = hc, p = fit$par)
 reset(hc)
 run(hc)
-
 
 normalize_to_giss(fetch_gmst(hc)) %>% 
   filter(year %in% gmst_obs_data$year) -> 

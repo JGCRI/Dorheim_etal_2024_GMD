@@ -16,6 +16,8 @@ version <- packageVersion("hector")
 assertthat::assert_that(version == "3.0.0")
 
 source(file.path(BASE_DIR, "R", "0B.functions.R"))
+load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
+
 
 # 1. Emission Driven Hector ---------------------------------------------------------------------
 # Years & variables to save. 
@@ -31,6 +33,8 @@ file.path(HECTOR_V3_DIR, "inst", "input") %>%
   lapply(function(f){
     name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
     core <- newcore(f, name = name)
+    set_params(core, p = fit$par)
+    reset(core)
     run(core)
     out1 <- fetchvars(core, dates = yrs, vars = vars)
     out2 <- fetchvars(core, dates = NA, vars = params)
@@ -56,29 +60,30 @@ file <- paste0("hector_", version, "_ssp.csv")
 write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
 
 # 2. Run Emission Driven RCP Hector --------------------------------------------------------
-file.path(BASE_DIR, "input") %>%  
-  list.files(pattern = "RCP", full.names = TRUE) %>% 
-  lapply(function(f){
-    name <- gsub(pattern = "v25_|.ini", replacement = "", x = basename(f))
-    core <- newcore(f, name = name)
-    run(core)
-    out1 <- fetchvars(core, dates = yrs, vars = vars)
-    out2 <- fetchvars(core, dates = NA, vars = params)
-    out <- rbind(out1, out2)
-    return(out)
-  }) %>%
-  do.call(what = "rbind") ->
-  rstls
-
-version <- packageVersion(pkg = "hector")
-rstls$version <- version
-
-file <- paste0("hector_", version, "_rcp.csv")
-write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
+# file.path(BASE_DIR, "input") %>%  
+#   list.files(pattern = "RCP", full.names = TRUE) %>% 
+#   lapply(function(f){
+#     name <- gsub(pattern = "v25_|.ini", replacement = "", x = basename(f))
+#     core <- newcore(f, name = name)
+#     set_params(core, p = fit$par)
+#     reset(core)
+#     run(core)
+#     out1 <- fetchvars(core, dates = yrs, vars = vars)
+#     out2 <- fetchvars(core, dates = NA, vars = params)
+#     out <- rbind(out1, out2)
+#     return(out)
+#   }) %>%
+#   do.call(what = "rbind") ->
+#   rstls
+# 
+# version <- packageVersion(pkg = "hector")
+# rstls$version <- version
+# 
+# file <- paste0("hector_", version, "_rcp.csv")
+# write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
 
 
 # 3. Run Concentration Driven RCP Hector --------------------------------------------------------
-
 # Years & variables to save. 
 yrs <- 1750:2100
 vars <- c(CONCENTRATIONS_CO2(), GLOBAL_TAS(), HEAT_FLUX(), RF_TOTAL(), RF_ALBEDO(), 
@@ -113,6 +118,7 @@ file.path(HECTOR_V3_DIR, "inst", "input") %>%
     hc <- newcore(inifile = ini_file, name = name)
     setvar(core = hc, dates = conc_inputs_hc$Date, var = conc_inputs_hc$name, 
            values = conc_inputs_hc$value, unit = conc_inputs_hc$units)
+    set_params(hc, p = fit$par)
     reset(hc)
     run(hc)
     out <- fetchvars(hc, dates = yrs, vars = vars)
