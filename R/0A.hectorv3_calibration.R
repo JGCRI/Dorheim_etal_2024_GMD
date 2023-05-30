@@ -11,8 +11,7 @@ library(tidyr)
 library(readxl)
 theme_set(theme_bw())
 
-# TODO update this to the v3 branch after the luc branch is merged in 
-#devtools::install_github("jgcri/hector@luc")
+
 #library(hector)
 devtools::load_all("~/Documents/Hector-Versions/v3/hector")
 

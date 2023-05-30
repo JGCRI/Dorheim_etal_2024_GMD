@@ -1,0 +1,376 @@
+---
+title: "Manuscript SI"
+author: "Kalyn Dorheim"
+date: "10/25/2022"
+output: 
+  html_document:
+    toc: yes
+    toc_depth: '4'
+    toc_float: yes
+    number_sections: true
+    date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+# Objective 
+ 
+Prepare the plots and other materials for the supplementary information porition of the Hector v3 manuscript.  
+
+
+# Set Up 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, error = FALSE, message = FALSE)
+# see https://bookdown.org/yihui/rmarkdown-cookbook/ for more info on markdowns
+```
+
+```{r, warning=FALSE, message = FALSE, echo=TRUE}
+library(assertthat)
+library(data.table)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+library(readr)
+library(readxl)
+library(hector)
+#devtools::load_all("~/projects/Hector-Versions/v3/hector/")
+
+# Load some custom helpful functions
+source(here::here("R", "0B.functions.R"))
+
+# Set up the relative paths
+BASE_DIR  <- here::here()
+FIGS_DIR  <- here::here("output", "figures")
+INPUT_DIR <- here::here("data")
+HECTOR_RSLTS_DIR <- here::here("output", "hector_output")
+#HECTOR_DATA_DIR <- "~/Documents/2022/hectordata/"
+
+# Define some overall figure aesthetics
+THEME_BASE_SIZE <- 10
+theme_set(theme_bw(base_size = THEME_BASE_SIZE) + 
+            theme(legend.title = element_blank()))
+FULL_FIG <- data.frame(width = 7, height = 7)
+MANUSCRIPT_FIG <- data.frame(width = 4, height = 3)
+
+COLOR_SCHEME <- c("grey" = "#999999", "col1" = "#56B4E9", "black" = "#000000",
+                  "#009E73", "#E69F00", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+SSP_COLORS <- c("ssp119" = "#00a9cf", "ssp126" = "#003466", "ssp245" = "#f69320",
+                  "ssp370" = "#df0000", "ssp434" = "#2274ae","ssp460" = "#b0724e",
+                  "ssp585"= "#980002", "historical" = "#000000", "historical"="#92397a")
+OBS_SCHEME <- c("obs" = "grey", "Hector v3" = "#E69F00")
+```
+
+# Temperature Component 
+
+
+```{r}
+years_to_keep <- 1750:2100
+vars_to_keep <- c(GLOBAL_TAS(), LAND_TAS(), SST(), CONCENTRATIONS_CO2(), RH(), OCEAN_C())
+
+inifile <- file.path(system.file("input", package = "hector"), "hector_ssp245.ini")
+
+core    <- newcore(inifile)
+reset(core)
+run(core, max(years_to_keep))
+out1 <- fetchvars(core, years_to_keep, vars_to_keep)
+out1$scenario <- "default"
+out1$variable <- paste0(gsub(out1$variable, pattern = "_", replacement = " "),
+                        " (", out1$units, ")")
+
+```
+
+
+
+```{r}
+
+out1 %>% 
+  filter(variable %in% c("land tas (degC)", "sst (degC)")) %>% 
+  spread(variable, value) %>% 
+  mutate(ratio = `land tas (degC)`/`sst (degC)`) -> 
+  ratio_df
+
+ratio_df$ratio %>% summary()
+ratio_df$ratio %>% median(na.rm = TRUE)
+```
+
+
+
+
+
+```{r}
+# Try running with CO2 concentration constraints 
+# out1 %>% 
+#   filter(variable == "CO2 concentration (ppmv CO2)") -> 
+#   co2_conc
+
+
+# Helper function that runs a Hector core with a new land-ocean warming ratio.
+#
+# Args
+#   hc: an active Hector core
+#   value: the land ocean warming ratio to use
+# Return: data frame of Hector results
+run_with_lo <- function(hc, value) {
+
+    # Set the land ocean warming ratio
+    setvar(hc, NA, LO_WARMING_RATIO(), value, getunits(LO_WARMING_RATIO()))
+    #setvar(hc, dates = co2_conc$year, var = CO2_CONSTRAIN(), values = co2_conc$value, getunits(CO2_CONSTRAIN()))
+
+    # Reset and run Hector
+    reset(hc)
+    run(hc)
+
+    # Fetch and format the output
+    out <- fetchvars(hc, years_to_keep, vars_to_keep)
+    out$scenario <- value
+    out$variable <- paste0(gsub(out$variable, pattern = "_", replacement = " "),
+                           " (", out$units, ")")
+
+    return(out)
+}
+
+# Make a vector of the land ocean warming ratios to test out
+lo_to_use <- seq(from = 1.54, to = 1.81, length.out = 10)
+
+# Apply our helper function to the various land ocean warming ratio values and
+# concatenate the results into a single data frame
+results_list <- lapply(lo_to_use, run_with_lo, hc = core)
+hector_lo_results <- do.call(results_list, what = "rbind")
+
+# hector_lo_results %>% 
+#   filter(variable %in% c("global tas (degC)", "land tas (degC)", "sst (degC)")) -> 
+#   hector_lo_results
+
+ggplot(data = hector_lo_results %>% filter(year >= 1900)) +
+    geom_line(aes(year, value, color = scenario, group = scenario)) +
+    facet_wrap("variable", scales = "free", ncol = 1) +
+    labs(title = "User provided land-ocean warming ratio",
+         subtitle = NULL,
+         x = NULL,
+         y = NULL) +
+    theme(axis.text.x = element_text(angle = 45)) +
+  theme_bw(base_size = THEME_BASE_SIZE) +
+    guides(color = guide_legend(title = "lo ratio")) + 
+  labs(title = NULL) -> 
+  plot
+
+ggsave(plot, filename = file.path(FIGS_DIR, "si_lo_ratio.png"), 
+       width = MANUSCRIPT_FIG$width, height = MANUSCRIPT_FIG$height)
+```
+
+```{r}
+hector_lo_results %>% 
+  filter(year == 1950) %>% 
+  group_by(variable) %>% 
+  summarise(min = min(value), 
+            max = max(value), 
+            mean = mean(value), 
+            range = max - min)
+```
+
+
+```{r}
+hector_lo_results %>% 
+  filter(year == 2100) %>% 
+  group_by(variable) %>% 
+  summarise(min = min(value), 
+            max = max(value), 
+            mean = mean(value), 
+            range = max - min)
+```
+
+
+# Carbon Cycle 
+## Permafrost 
+
+```{r}
+ini <- system.file("input/hector_ssp245.ini", package = "hector")
+core <- newcore(ini, name = "ssp245-default")
+
+fetchvars(core, dates = NA, vars = PERMAFROST_C())
+
+invisible(run(core))
+
+# Output variables we want to retrieve
+climate_vars <- c(CONCENTRATIONS_CO2(), GLOBAL_TAS(), RF_CO2(), RF_TOTAL())
+permafrost_vars <- c(PERMAFROST_C(), THAWEDP_C(), RH(), CONCENTRATIONS_CH4())
+
+run1 <- fetchvars(core, dates = 1745:2300, vars = c(climate_vars, permafrost_vars))
+shutdown(core)
+
+core <- newcore(ini, name = "ssp245-permafrost")
+setvar(core, 0, PERMAFROST_C(), 865, "Pg C")
+invisible(run(core))
+
+run2 <- fetchvars(core, dates = 1745:2300, vars = c(climate_vars, permafrost_vars))
+
+fetchvars(core, 2300, PERMAFROST_C())
+shutdown(core)
+
+results <- rbind(run1, run2)
+
+ggplot(subset(results, variable %in% c(climate_vars)), 
+       aes(year, value, color = scenario)) + 
+    geom_line() +
+    facet_wrap(~variable, scales = "free")
+```
+```{r}
+subset(results, variable %in% c(ATMOSPHERIC_CO2(), CONCENTRATIONS_CH4(), GLOBAL_TAS())) %>% 
+  filter(year%in% 1950:2100) %>% 
+  spread(scenario, value) %>% 
+  mutate(change = `ssp245-permafrost` - `ssp245-default`) %>% 
+  ggplot(aes(year, change)) + 
+  geom_line() + 
+  facet_wrap("variable", scales = "free")
+```
+
+```{r}
+subset(results, variable %in% c("permafrost_c")) %>% 
+  dplyr::filter(scenario == "ssp245-permafrost") %>% 
+  dplyr::filter(year%in% 1950:2100) %>% 
+    ggplot(aes(year, value)) + 
+  geom_line() + 
+  facet_wrap("variable")
+
+
+
+
+```
+
+## Carbon Tracking 
+
+```{r}
+inifile <- file.path(system.file("input", package = "hector"),
+                     "hector_ssp245.ini")
+core <- newcore(inifile)
+
+fetchvars(core, NA, TRACKING_DATE())
+
+setvar(core, NA, TRACKING_DATE(), 1750, "(unitless)")
+fetchvars(core, NA, TRACKING_DATE())
+
+invisible(reset(core))
+run(core)
+
+tdata <- get_tracking_data(core)
+head(tdata)
+
+# okay so waht I am thinking is that here we will do an aggreate of ocean componet vs terrestiral cabron cycle the three large boxes to tell a simliar stroy mainly contrastint how the ocean is slower changing as we woudl expect and then comment on smoe other connection like 
+tdata %>% 
+  mutate(value = pool_value *  source_fraction) %>% 
+  mutate(componet = "atmosphere") %>% 
+  mutate(component = if_else(pool_name %in% c("HL" , "LL"  , "intermediate", "deep"), "ocean", componet))
+
+
+
+
+ggplot(tdata, aes(year, source_fraction, fill = source_name)) +
+    geom_area() +
+    facet_wrap(~pool_name) +
+    theme(axis.text = element_text(size = 7)) +
+    labs(x = "Year",
+         y = "Source Fraction",
+         title = "Source Percentage Change Over Time")
+```
+
+
+```{r}
+
+atmos <- subset(tdata, pool_name == "atmos_co2")
+
+ggplot(atmos, aes(year, source_fraction, fill = source_name)) +
+    geom_area() +
+    facet_wrap(~pool_name) +
+    labs(x = "Year",
+         y = "Source Fraction",
+         title = "Source Percentage Change Over Time - Atmosphere")
+```
+
+```{r}
+
+tracking_results <- function(inifile, start, stop, tracking, scenarioName) {
+    # Establish core, turn on tracking, run core
+    core <- newcore(inifile)
+    setvar(core, NA, TRACKING_DATE(), tracking, "(unitless)")
+    reset(core)
+    run(core)
+    
+    # Get results, filter by correct years, add columns containing the amount
+    # of carbon by source and the given scenario name
+    results <- get_tracking_data(core)
+    results <- subset(results,
+                      results$year >= start &
+                          results$year <= stop)
+    results$source_amount <- results$source_fraction * results$pool_value
+    results$scenario_name <- scenarioName
+    
+    return(results)
+}
+
+AF_calc <- function(start, results, stop) {
+    
+    # Isolate the atmos_co2 pool and earth_c source in start/end years
+    atm_c <- subset(results, results$pool_name == "atmos_co2")
+    atm_c <- subset(atm_c, atm_c$source_name == "earth_c")
+    
+    atm_c1 <- subset(atm_c, atm_c$year == start)
+    atm_c2 <- subset(atm_c, atm_c$year == stop)
+    atm_c <- rbind(atm_c1, atm_c2)
+    
+    # Calculate atmospheric uptake of Earth carbon
+    atm_c <- tail(atm_c$source_amount, n = 1) - head(atm_c$source_amount, n = 1)
+    
+    # Isolate earth_c pool and source in start/end years
+    earth_c_loss <- subset(results,
+                           results$pool_name == "earth_c" &
+                               results$source_name == "earth_c" &
+                               results$year %in% c(start, stop))
+    
+    # Calculate change in Earth carbon
+    earth_c_loss <- head(earth_c_loss$source_amount, n = 1) -
+        tail(earth_c_loss$source_amount, n = 1)
+    
+    # Airborne fraction calculation
+    AF <- atm_c / earth_c_loss
+    
+    return(AF)
+}
+```
+
+```{r}
+
+ssp245 <- system.file("input", "hector_ssp245.ini", package = "hector")
+results <- tracking_results(ssp245, 1750, 2050, 1750, "SSP245")
+
+years <- seq(1950, 2020, by = 10)
+airborne_frac <- cbind(make.row.names = years, lapply(years, AF_calc, results, 1750))
+colnames(airborne_frac) <- c("year", "AF")
+
+tail(airborne_frac, n = 1)
+
+# Knorr avg - values from Knorr 2009
+knorr_values <- c(0.45, 0.453, 0.518, 0.468, 0.468, 0.514, 0.449)
+knorr_avg <- mean(knorr_values)
+knorr_minmax <- max(knorr_values) - min(knorr_values)
+
+
+vars <- c("Knorr avg", years)
+values <- c(knorr_avg, as.numeric(airborne_frac[, 2]))
+error <- c(knorr_minmax, rep(0, times = 8))
+
+df <- data.frame(vars, values, error)
+
+ggplot(df) +
+  aes(x = vars, y = values, fill = vars) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(aes(ymin = values - error, ymax = values + error), width = 0.2) +
+  scale_fill_manual(values = c("paleturquoise3", "paleturquoise2", "paleturquoise1",
+                               "darkslategray1", "darkslategray2", "darkslategray3",
+                               "darkslategray4", "darkslategray", "grey50")) +
+  theme(legend.position = "none") +
+  labs(x = "Year",
+       y = "Airborne fraction over time",
+       title = "Airborne Fraction Composition")
+
+invisible(shutdown(core))
+```
+

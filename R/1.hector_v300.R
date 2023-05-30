@@ -13,7 +13,7 @@ BASE_DIR <- here::here()
 OUTPUT_DIR <- file.path(BASE_DIR, "output", "hector_output")
 
 version <- packageVersion("hector")
-assertthat::assert_that(version == "3.0.0")
+assertthat::assert_that(version == "3.0.1")
 
 source(file.path(BASE_DIR, "R", "0B.functions.R"))
 load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
@@ -24,7 +24,7 @@ load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
 yrs <- 1750:2100
 vars <- c(CONCENTRATIONS_CO2(), GLOBAL_TAS(), HEAT_FLUX(), RF_TOTAL(), RF_ALBEDO(), 
           RF_CO2(), RF_SO2(), RF_OC(), RF_BC(), LAND_TAS(), SST(), FFI_EMISSIONS(),
-          DACCS_UPTAKE(), LUC_EMISSIONS(), LUC_UPTAKE(), NBP())
+          DACCS_UPTAKE(), LUC_EMISSIONS(), LUC_UPTAKE(), NBP(), OCEAN_UPTAKE(), NPP(), PH())
 params <- c(ECS(), DIFFUSIVITY(), AERO_SCALE(), VOLCANIC_SCALE(), BETA(), Q10_RH())
 
 # Run Hector v3 with the SSP scenarios 

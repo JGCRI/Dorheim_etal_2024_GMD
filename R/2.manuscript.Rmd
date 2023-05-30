@@ -31,7 +31,7 @@ library(tidyr)
 library(readr)
 library(readxl)
 library(hector)
-#devtools::load_all("~/projects/Hector-Versions/v3/hector/")
+devtools::load_all("~/projects/Hector-Versions/v3/hector/")
 
 # Load some custom helpful functions
 source(here::here("R", "0B.functions.R"))
@@ -109,13 +109,27 @@ hector_ssp %>%
   filter(year <= 2020) -> 
   hector_co2
 
+
+# The cmip6_co2_obs data needs to be split into two categories to indiacate the period of time 
+# that was used in the calibration process. 
+cmip6_co2_obs %>% 
+  filter(year < 1959) -> 
+  comparison 
+
+cmip6_co2_obs %>% 
+  filter(year >= 1959) -> 
+  calibration 
+
 ggplot() + 
-  geom_line(data = cmip6_co2_obs, aes(year, value, color = "Meinshausen et al 2017"), size = 1) + 
-  geom_line(data = noaa_co2_obs, aes(year, value, color = "Lan et al 2023"), size = 1) +
-  geom_line(data = hector_co2, aes(year, value, color = "Hector v3"), size = 1.5, linetype = 2) + 
+  #geom_line(data = cmip6_co2_obs, aes(year, value, color = "Meinshausen et al 2017"), size = 1.5) + 
+    geom_line(data = comparison, aes(year, value, color = "Meinshausen et al 2017"), size = 1.5) +
+    geom_line(data = calibration, aes(year, value, color = "Meinshausen et al 2017"), size = 1.5, linetype = 2) + 
+
+  #geom_line(data = noaa_co2_obs, aes(year, value, color = "Lan et al 2023"), size = 1) +
+  geom_line(data = hector_co2, aes(year, value, color = "Hector v3"), size = 1.5, alpha = 0.7) + 
   scale_color_manual(values = c("Hector v3" = OBS_SCHEME[["Hector v3"]],
-                                "Meinshausen et al 2017" = OBS_SCHEME[["obs"]],
-                                "Lan et al 2023" = "black")) + 
+                                "Meinshausen et al 2017" = "black" #, "Lan et al 2023" = "black"
+                                )) + 
   labs(x = "Year", y = expression('CO'[2]~' (ppm)')) + 
   theme(legend.position = "bottom") -> 
   plot; plot
@@ -123,6 +137,57 @@ ggplot() +
 ggsave(plot, filename = file.path(FIGS_DIR, "co2_observations.png"), 
        width = MANUSCRIPT_FIG$width, height = MANUSCRIPT_FIG$height)
 ```
+
+Evaluate historical performance of the model. 
+
+```{r}
+cmip6_co2_obs %>% 
+  select(year, co2_obs = value) -> 
+  cmip6_co2_obs_wide
+
+# Calculate the RMSE over the entire observational record. 
+hector_co2 %>% 
+  filter(year %in% cmip6_co2_obs$year) %>% 
+  select(year, hector_co2 = value) %>% 
+  inner_join(cmip6_co2_obs_wide) -> 
+  wide_data
+
+# Calculate the RMSE 
+wide_data %>% 
+  mutate(SE = (hector_co2-co2_obs)^2) %>% 
+  pull(SE) %>% 
+  mean() %>% 
+  sqrt() -> 
+  RMSE_co2
+RMSE_co2
+
+# Calculate the RMSE excluding the calibration period
+hector_co2 %>% 
+  filter(year %in% cmip6_co2_obs$year) %>% 
+  select(year, hector_co2 = value) %>% 
+  inner_join(cmip6_co2_obs_wide) %>% 
+  filter(year < 1959) -> 
+  wide_data
+
+# Calculate the RMSE 
+wide_data %>% 
+  mutate(SE = (hector_co2-co2_obs)^2) %>% 
+  pull(SE) %>% 
+  mean() %>% 
+  sqrt() -> 
+  RMSE_co2
+RMSE_co2
+
+wide_data %>% 
+  ggplot(aes(co2_obs, hector_co2)) + 
+  geom_point() + 
+  labs(x = expression('Meinshausen et al 2017 CO'[2]~' (ppm)'),  
+       y = expression('Hector CO'[2]~' (ppm)'))
+
+fit <- lm(data = wide_data, formula = co2_obs~hector_co2)
+summary(fit)
+```
+
 
 ## Global Mean Surface Temperature 
 
@@ -155,6 +220,17 @@ names(hadcrut_obs_data) <- c("year", "value", "lower", "upper")
 hadcrut_obs_data$variable <- "gmst"
 hadcrut_obs_data <- normalize_to_giss(hadcrut_obs_data) 
 
+
+mean(hadcrut_obs_data$upper - hadcrut_obs_data$lower)
+sd(hadcrut_obs_data$value)
+
+# is this how we should quantify the variabilty? 
+fit <- lm(data = hadcrut_obs_data, value ~ year)
+sd(fit$residuals)
+
+
+
+
 yrs <- unique(c(giss_gmst_obs$year, hadcrut_obs_data$year))
 
 hector_ssp %>% 
@@ -168,11 +244,12 @@ hector_ssp %>%
 
 ggplot() + 
   geom_line(data = hadcrut_obs_data, aes(year, value, color = "Morice et al 2020"), size = 1) + 
-  geom_line(data = giss_gmst_obs, aes(year, value, color = "Lenssen et al 2019"), size = 1) + 
+ # geom_line(data = giss_gmst_obs, aes(year, value, color = "Lenssen et al 2019"), size = 1) + 
   geom_line(data = hector_gmst, aes(year, value, color = "Hector v3"), size = 1.5) + 
   scale_color_manual(values = c("Hector v3" = OBS_SCHEME[["Hector v3"]],
-                                "Lenssen et al 2019" = "black",
-                                "Morice et al 2020" = OBS_SCHEME[["obs"]])) + 
+                               # "Lenssen et al 2019" = "black",
+                                "Morice et al 2020" = "black"
+                                )) + 
   labs(x = "Year", y = expression("Temperature anomaly relative to 1961–1990 ("~degree~"C)")) + 
   theme(legend.position = "bottom") -> 
   plot; plot
@@ -180,6 +257,40 @@ ggplot() +
 ggsave(plot, filename = file.path(FIGS_DIR, "gmst_observations.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 ```
+
+```{r}
+hadcrut_obs_data %>% 
+  select(year, obs = value) -> 
+  wide_gmst_obs
+
+hector_gmst %>% 
+  select(year, hector_gmst = value) %>% 
+  inner_join(wide_gmst_obs) -> 
+  gmst_wide
+
+gmst_wide %>% 
+  ggplot(aes(obs, hector_gmst)) + 
+  geom_point()
+
+fit <- lm(data = gmst_wide, hector_gmst~obs)
+summary(fit)
+
+gmst_wide %>% 
+  mutate(SE = (hector_gmst - obs)^2) %>%  
+  pull(SE) %>% 
+  mean() %>% 
+  sqrt() -> 
+  RMSE 
+RMSE
+
+gmst_wide %>% 
+  ggplot(aes(obs, hector_gmst)) + 
+  geom_point() + 
+  labs(x = expression('Morice et al 2020 GMST ('~degree~"C)"),  
+       y = expression('Hector GMST ('~degree~"C)"))
+```
+
+
 
 
 # CMIP6 Comparison 
@@ -190,7 +301,8 @@ scns <- c("ssp245", "ssp126", "ssp585")
 # G. A. Meehl, C. A. Senior, V. Eyring, G. Flato, J.-F. Lamarque, R. J. Stouffer, K. E. Taylor,
 # M. Schlund, Context for interpreting equilibrium climate sensitivity and transient climate response
 # from the CMIP6 Earth system models. Sci. Adv. 6, eaba1981 (2020). 
-# Schlund, Manuel, Axel Lauer, Pierre Gentine, Steven C. Sherwood, and Veronika Eyring. 2020. “Emergent Constraints on Equilibrium Climate Sensitivity in CMIP5: Do They Hold for CMIP6?” Earth System Dynamics 11 (4): 1233–58.
+# Schlund, Manuel, Axel Lauer, Pierre Gentine, Steven C. Sherwood, and Veronika Eyring. 2020. 
+# “Emergent Constraints on Equilibrium Climate Sensitivity in CMIP5: Do They Hold for CMIP6?” Earth System Dynamics 11 (4): 1233–58.
 
 # Lovato, T., Peano, D., Butenschön, M., Materia, S., Iovino, D., Scoccimarro, E.,
 # et al. (2022). CMIP6 simulations with the CMCC Earth System Model (CMCCESM2). 
@@ -213,13 +325,15 @@ cmip6_ecs <- as.data.frame(rbind(c("ACCESS-CM2", 4.7),
                                  c("CMCC-ESM2", 3.57)))
 names(cmip6_ecs) <- c("model", "ecs")
 
+
+# TS.3.2 Climate Sensitivity and Earth System Feedbacks
+# the likely range is 2.5°C to 4°C and the very likely range is 2°C to 5°C. 
 cmip6_ecs %>%  
-  mutate(id = "unlikely") %>% 
+  mutate(id = "not very likely") %>% 
   mutate(id = ifelse(ecs >= 2 & ecs <= 5, "very likely", id)) -> 
   ecs_table
 
 read.csv(here::here("data", "cmip6_model_means.csv")) %>% 
-  #  mutate(model = if_else(grepl(pattern = "CMCC-ESM2", x = model), model, "CMCC-ESM2")) %>% 
   dplyr::filter(scenario %in% scns)  %>% 
   filter(model %in% cmip6_ecs$model) %>% 
   full_join(ecs_table, by = "model") -> 
@@ -249,7 +363,8 @@ ggplot() +
   facet_grid(scenario~variable, labeller = labeller(variable = temp_labs), scales = "free") + 
   labs(y = expression("Temperature anomaly relative to 1850-1860 ("~degree~"C)"), x = NULL) + 
   scale_color_manual(values = c("Hector v3" = OBS_SCHEME[["Hector v3"]])) + 
-  scale_fill_manual(values = c("very likely" = "#5A5A5A", "unlikely"="#D3D3D3")) + 
+  scale_fill_manual(values = c("very likely" = "#5A5A5A", 
+                               "not very likely" = "#D3D3D3")) + 
   theme(panel.grid.minor.x = element_blank(), 
         panel.grid.minor.y = element_blank(), 
         legend.position = "bottom") + 
@@ -260,9 +375,32 @@ ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_temps.png"),
        width = MANUSCRIPT_FIG$width * 1.25, height = MANUSCRIPT_FIG$height * 1.25)
 
 ```
+Summary statistics on where the Hector results fall within the stuff 
+
+```{r}
+cmip6_rslts %>% 
+  filter(id == "very likely") %>% 
+  group_by(scenario, year, variable, id) %>% 
+  summarise(min = min(value), 
+            max = max(value), 
+            mean = mean(value), 
+            q25 = quantile(value, 1/4), 
+            q75 = quantile(value, 3/4)) -> 
+  summary_stats
 
 
-# Recreating IPCC SPM10 
+summary_stats %>% 
+  inner_join(hector_temp) %>% 
+  ungroup() %>% 
+  filter(value > max) %>% 
+  select(scenario, variable) %>% 
+  distinct()
+
+```
+
+# IPCC AR6 comparisons 
+
+## Recreating IPCC SPM10 
 
 ```{r, warning=FALSE}
 # Read in the IPCC results 
@@ -293,24 +431,106 @@ ggplot() +
 ggsave(plot, filename = file.path(FIGS_DIR, "recreate_IPCC_fig.png"), 
        width = MANUSCRIPT_FIG$width * 2, height = MANUSCRIPT_FIG$height * 1.75)
 ```
+```{r}
+mean(hector_tas_v_co2$gmst/hector_tas_v_co2$co2 ) * 1000 * 3.67
+
+hector_tas_v_co2 %>% 
+  filter(co2 < 1000) %>% 
+  tail()
 
 
+mean(hector_tas_v_co2$gmst/hector_tas_v_co2$co2) * 1000
 
-# TODO! 
+```
 
-calcualte TCRE, ZCRE, performance compared with idealized rcmip results & then comoparison with v2 comparisons comparison of co2 dirven and emissions driven? also what about the cmoparison with the [CO2] 
+## Recreating Table SPM.1
 
-We  use  the  recent  assessment  of  Sherwood  et  al.  (2020)  for  equilibrium  climate  sensitivity  (ECS).  ECS  is  defined  as  the  equilibrium  warming  which  occurs  under  a  doubling  of  atmospheric  CO2  concentrations  relative  to  preindustrial  concentrations.  The  ECS  assessment  is  combined  with  the  constrained  transient  climate response (TCR) assessment of Tokarska et al. (2020). 
+```{r}
+hector_ssp %>% 
+  filter(variable == "gmst") %>% 
+  filter(scenario == "ssp119") %>% 
+  filter(year %in% 1850:1900) %>% 
+  pull(value) %>% 
+  mean -> 
+  ref
 
-TCR is defined as the surface air temperature change  which  occurs  at  the  time  at  which  atmospheric  CO2  concentrations  double  in  an  experiment  in  which atmospheric CO2 concentrations rise at one percent per year (a 1pctCO2 experiment). 
+hector_ssp %>% 
+  filter(!grepl(pattern = "conc", x = scenario)) %>%  
+  filter(scenario %in% c("ssp119", "ssp126", "ssp245", "ssp370", "ssp585")) %>% 
+  filter(version == "3.0.0") %>% 
+  filter(variable == "gmst") %>% 
+  mutate(value = value - ref) %>% 
+  mutate(period = "x") %>% 
+  mutate(period = if_else(year %in% 2021:2040, "near term", period)) %>% 
+  mutate(period = if_else(year %in% 2041:2060, "mid term", period)) %>% 
+  mutate(period = if_else(year %in% 2081:2100, "long term", period)) %>% 
+  group_by(scenario, period) %>% 
+  summarise(value = mean(value)) %>% 
+  spread(period, value) %>% 
+  select(-x)
+```
 
-Carbon cycle behavior  is  considered  only  via  the  transient  climate  response  to  emissions  (TCRE).  TCRE  is  defined  as  the  ratio  of  surface  air  temperature  change  to  cumulative  CO2  emissions  at  the  time  when  atmospheric  CO2 concentrations double in a 1pctCO2 experiment. 
+# Hector's contemporary state (e.g. magnitude of land and ocean sinks, ocean pH, NPP, etc)
 
 
+## GCP Land Sink
 
+The land CO2 sink continued to increase during the 2012–2021 period primarily in response to increased atmospheric CO2, albeit with large interannual variability. The land CO2 sink was 3.1 ± 0.6 GtC yr−1 during the decade 2012–2021 (29 % of total CO2 emissions), 0.4 GtC yr−1 larger than during the previous decade (2000–2009), with a preliminary 2022 estimate of around 3.4 GtC yr−1.^[https://essd.copernicus.org/articles/14/4811/2022/]
 
+```{r}
+hector_ssp %>% 
+  filter(!grepl(pattern = "conc", x = scenario)) %>%  
+  filter(variable == "land sink") %>% 
+  filter(version == "3.0.0") %>% 
+  filter(scenario == "ssp245") %>%
+  filter(year %in% 2012:2021) %>% 
+  group_by(variable) %>% 
+  summarise(mean = mean(value), 
+            sd = sd(value)) -> 
+    modern_decade; modern_decade
+```
+## GCP Ocean Sink 
 
+The ocean CO2 sink was 2.9 ± 0.4 GtC yr−1 during the decade 2012–2021 (26 % of total CO2 emissions), with a similar preliminary estimate of 2.9 GtC yr−1 for 2022.^[https://essd.copernicus.org/articles/14/4811/2022/]
 
+```{r}
+hector_ssp %>% 
+  filter(!grepl(pattern = "conc", x = scenario)) %>%  
+  filter(variable == OCEAN_UPTAKE()) %>% 
+  filter(year %in% 2012:2021) %>% 
+  group_by(variable, units) %>% 
+  summarise(mean = mean(value), 
+            sd = sd(value)) 
+```
 
+# ocean pH, NPP, 
+
+```{r}
+hector_ssp %>% 
+  filter(!grepl(pattern = "conc", x = scenario)) %>%  
+  filter(variable == PH()) %>% 
+  filter(year %in% 2012:2021) %>% 
+  group_by(variable, units) %>% 
+  summarise(mean = mean(value), 
+            sd = sd(value)) 
+```
+
+```{r}
+hector_ssp %>% 
+  filter(!grepl(pattern = "conc", x = scenario)) %>%  
+  filter(variable == PH()) %>% 
+  filter(year %in% 2012:2021) 
+```
+
+```{r}
+hector_ssp %>% 
+  filter(variable %in% c("land sink", "gmst", "ocean_uptake", "pH", "sst", "NPP")) %>% 
+  #filter(version == "3.0.0") %>% 
+  filter(scenario == "ssp245") %>%
+ filter(year %in% 2012:2021) %>% 
+  group_by(variable, units) %>% 
+  summarise(mean = mean(value), 
+            sd = sd(value))
+```
 
 
