@@ -1,26 +1,26 @@
 library(assertthat)
 
-# Get gmst results from a Hector tun 
-# Args 
-#   core: active hector core
-# Return data frame of the global mean surface temperature 
-fetch_gmst <- function(core){
-  
-  flnd  <- 0.29  
-  
-  fetchvars(core, dates = 1750:2100, vars = c(LAND_TAS(), SST())) %>% 
-    select(year, variable, value) -> 
-    output
-  
-  output <- reshape(output, direction = "wide", idvar = "year", timevar = "variable")
-  names(output) <- gsub("value.", "", names(output))
-  
-  output$value <- with(output, (land_tas * flnd + sst * (1 - flnd)))
-  output <- subset(output, select = c(year, value))
-  output$variable <- "gmst"
-  
-  return(output)
-}
+# # Get gmst results from a Hector tun 
+# # Args 
+# #   core: active hector core
+# # Return data frame of the global mean surface temperature 
+# fetch_gmst <- function(core){
+#   
+#   flnd  <- 0.29  
+#   
+#   fetchvars(core, dates = 1750:2100, vars = c(LAND_TAS(), SST())) %>% 
+#     select(year, variable, value) -> 
+#     output
+#   
+#   output <- reshape(output, direction = "wide", idvar = "year", timevar = "variable")
+#   names(output) <- gsub("value.", "", names(output))
+#   
+#   output$value <- with(output, (land_tas * flnd + sst * (1 - flnd)))
+#   output <- subset(output, select = c(year, value))
+#   output$variable <- "gmst"
+#   
+#   return(output)
+# }
 
 # Normalize temperature to the historical reference period
 # Args 

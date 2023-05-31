@@ -6,7 +6,6 @@ library(ggplot2)
 library(tidyr)
 source("R/0B.functions.R")
 
-devtools::load_all("~/projects/Hector-Versions/v3/hector/")
 library(hector)
 version <- packageVersion("hector")
 assertthat::assert_that(version == "3.0.0")

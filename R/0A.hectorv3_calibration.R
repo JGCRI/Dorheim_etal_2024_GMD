@@ -1,7 +1,7 @@
 # Emission driven Hector was underestimating CH4 & N2O RF related to natural CH4 & N2O emissions.
 # Update the natural emissions so that the CH4 RF and N2O RF are consistent with AR6 historical values. 
 
-# Set up the environment with the correct hector version! 
+# 0. Set up -------------------------------------------------------------------------------------------
 library(assertthat)
 library(data.table)
 library(dplyr)
