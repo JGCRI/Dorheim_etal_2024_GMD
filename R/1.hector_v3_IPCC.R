@@ -10,10 +10,9 @@ source("R/0B.functions.R")
 library(hector)
 version <- packageVersion("hector")
 assertthat::assert_that(version == "3.1.1")
-
-# TODO
-# Check the calibration values 
-# load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
+# Make sure the ini files being used are consistent with the calibration results from 
+# part A. This check was only important before the V3 release.
+source(here::here("R", "0C.check_ini_values.R"))
 
 # The contents of the IPCC_DIR are the supplemental material figure 10 the cumulative CO2 
 # emissions vs global temperature change

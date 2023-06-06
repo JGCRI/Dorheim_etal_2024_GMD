@@ -8,10 +8,9 @@ library(tidyr)
 library(hector)
 version <- packageVersion("hector")
 assertthat::assert_that(version == "3.1.1")
-
-# TODO
-# Check the calibration values 
-# load("output/calibration-Mon_Jan_16_15:33:01_2023.rda")
+# Make sure the ini files being used are consistent with the calibration results from 
+# part A. This check was only important before the V3 release.
+source(here::here("R", "0C.check_ini_values.R"))
 
 source(file.path(BASE_DIR, "R", "0B.functions.R"))
 

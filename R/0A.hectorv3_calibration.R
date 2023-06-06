@@ -6,9 +6,12 @@ library(assertthat)
 library(data.table)
 library(dplyr)
 library(ggplot2)
+
 remotes::install_github("JGCRI/hector")
 library(hector) 
 assert_that(packageVersion("hector") ==  "3.1.1")
+
+BASE_DIR <- here::here()
 
 
 # 1. Adjust natural CH4 and N2O emissions -------------------------------------------------------------------------------------------
@@ -127,6 +130,9 @@ natural_emiss_fit$par
 # On May 30 2023 
 # nat_n2o    nat_ch4 
 # 9.718591 340.902647 
+
+save(natural_emiss_fit,
+     file = file.path(BASE_DIR, "output", paste0("calibration-natemissions-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
 
 remove("ar6_names", "ar6_results", "core_list", "format_data", "get_ar6_data", "hector_names",
        "ini_files", "optim_nat_hector", "par", "result")
@@ -285,4 +291,4 @@ fit <- optim(get_mse,
              gmst_obs = gmst_obs_data,
              co2_obs = co2_obs_data)
 
-save(fit, file = file.path(BASE_DIR, "output", paste0("calibration-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
+save(fit, file = file.path(BASE_DIR, "output", paste0("calibration-diff_beta_q10-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
