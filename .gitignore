@@ -89,6 +89,7 @@ packrat/lib*/
 # Project related things to ignore 
 *logs*
 *figures*
+*scratch*
 
 
 
