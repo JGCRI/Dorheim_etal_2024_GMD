@@ -331,6 +331,7 @@ hector_ssp %>%
   filter(variable %in% c(SST(), GLOBAL_TAS(),  LAND_TAS())) -> 
   hector_temp
 
+
 # Normalize the Hector temperatures to the CMIP6 reference period
 split(hector_temp, interaction(hector_temp$variable, hector_temp$scenario), drop = TRUE) %>% 
   lapply(FUN = normalize_hector_temp, period = 1850:1860) %>%  
@@ -422,15 +423,10 @@ ggsave(plot, filename = file.path(FIGS_DIR, "recreate_IPCC_fig.png"),
 ```
 
 
-Get information about the TRCE
+Get information about the TCRE
 ```{r}
-mean(hector_tas_v_co2$gmst/hector_tas_v_co2$co2 ) * 1000 * 3.67
-
-hector_tas_v_co2 %>% 
-  filter(co2 < 1000) %>% 
-  tail()
-
-mean(hector_tas_v_co2$gmst/hector_tas_v_co2$co2) * 1000
+fit <- lm(data = hector_tas_v_co2, formula = gmst~co2)
+fit$coefficients[[2]]* 1000 * 3.67
 ```
 
 ## Recreating Table SPM.1
