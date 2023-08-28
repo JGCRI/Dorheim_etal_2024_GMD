@@ -74,7 +74,7 @@ R/batchrunner/*.csv
 .RData
 inst/doc
 vignettes/rsconnect
-
+*.Rproj
 
 # vignette caches
 /vignettes/*_cache
