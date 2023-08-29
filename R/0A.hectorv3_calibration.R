@@ -1,21 +1,29 @@
-# Emission driven Hector was underestimating CH4 & N2O RF related to natural CH4 & N2O emissions.
-# Update the natural emissions so that the CH4 RF and N2O RF are consistent with AR6 historical values. 
-
+# Objective: Calibrate the parameter variables for natural CH4 and N20. Then calibrate 
+# Hector parameter values for diff (ocean heat diffusitivty), q10_rh (temperature effects 
+# on heterotrophic respiration), and beta (the CO2 fertilization factor). This 
+# script only needs to be run once in order to determine the new default Hector parameters. 
+# After this script is completed the default ini files included in the Hector package 
+# will need to be updated accordingly. 
 # 0. Set up -------------------------------------------------------------------------------------------
+# The required packages 
 library(assertthat)
 library(data.table)
 library(dplyr)
 library(ggplot2)
 
+# Read in the project constants (root directory name and the Hector pacakge version 
+# that should be used). 
+source("R/0.constants.R")
+
+# Make sure the correct version of Hector is being used. 
 remotes::install_github("JGCRI/hector")
 library(hector) 
-assert_that(packageVersion("hector") ==  "3.1.1")
+assert_that(packageVersion("hector") ==  HECTOR_VERSION)
 
-BASE_DIR <- here::here()
 
 
 # 1. Adjust natural CH4 and N2O emissions -------------------------------------------------------------------------------------------
-# Here we will calibrate two Hector parameters, natural CH4 and N2O emissions to AR6 Chapter 7 RF.
+# Calibrate the natural contributions of CH4 and N2O emissions by calibrating to results from AR6 CH 7.  
 
 # Define the helper functions used to format the data 
 # Extract information from the file name 
@@ -45,7 +53,7 @@ format_data <- function(path){
 # Returns: data.frame, long of the ERF for the different forcing agents 
 get_ar6_data <- function(path){
   
-  dat <- read.csv(path, stringsAsFactors = FALSE)
+  dat <- as.data.table(read.csv(path, stringsAsFactors = FALSE))
   info <- format_data(path)
   
   dat %>% 
@@ -292,3 +300,7 @@ fit <- optim(get_mse,
              co2_obs = co2_obs_data)
 
 save(fit, file = file.path(BASE_DIR, "output", paste0("calibration-diff_beta_q10-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
+
+# 3. Next Step -----------------------------------------------------------------
+# The ini files defined in the Hector repository /inst/input will need to be updated 
+# to use the new parameter values. This step has not been automated. 
