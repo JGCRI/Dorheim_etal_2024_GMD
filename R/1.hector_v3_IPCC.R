@@ -17,7 +17,7 @@ source(here::here("R", "0C.check_ini_values.R"))
 # The contents of the IPCC_DIR are the supplemental material figure 10 the cumulative CO2 
 # emissions vs global temperature change
 # https://data.ceda.ac.uk/badc/ar6_wg1/data/spm/spm_10/v20210809
-IPCC_DIR <- here::here("data", "IPCC_SPM10")
+IPCC_DIR <- file.path(BASE_DIR, "data", "IPCC_SPM10")
 
 
 # Load the IPCC tas vs co2 results 

@@ -1,11 +1,12 @@
 # This script formats the cmip6 output results from 
-# https://github.com/JGCRI/hector_cmip6data (182ee34) 
+# https://github.com/JGCRI/hector_cmip6data 
 # into ready to plot/analyze data for the manuscript. 
 # 0. Set Up ----------------------------------------------------------------
 library(dplyr)
 library(hector)
+source("R/0.constants.R")
+CMIP_DIR <- file.path(BASE_DIR, "data", "cmip")
 
-CMIP_DIR <- here::here("data", "cmip6")
 
 # Concatenate the historical and the future scenario results 
 # this creates a continuous time series between the historical 

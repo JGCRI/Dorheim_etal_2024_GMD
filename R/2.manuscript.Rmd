@@ -13,7 +13,7 @@ output:
 
 # Obejective 
 
-Visualize and crunch the numbers used to generate figures for the Hector v3 manuscript. 
+Visualize and crunch the numbers used to generate figures for the Hector V3 manuscript. 
 
 # Set Up 
 

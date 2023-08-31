@@ -1,10 +1,13 @@
-# Scrape the Hector C++ code base & the input tables for information to include in the manuscript 
+# Objective: Scrape the Hector C++ code base & the input tables for information to include in the manuscript
 
 # 0. Set Up -----------------------------------------------------------------------------------------------------
 library(dplyr)
+# Load project functions and constants. 
+source(here::here("R", "0.constants.R"))
+source(file.path(BASE_DIR, "R", "0B.functions.R"))
 library(hector)
-hector_version <- packageVersion("hector")
-assertthat::assert_that(hector_version == "3.1.1")
+version <- packageVersion("hector")
+assertthat::assert_that(version == HECTOR_VERSION)
 
 
 # 1. Emissions -----------------------------------------------------------------------------------------------------
@@ -16,11 +19,9 @@ system.file("input/tables/ssp245_emiss-constraints_rf.csv", package = "hector") 
 
 xx <- names(data)
 
-
 # subtract the one because the ffi_emissions and luc_emissions both refer to CO2 emissions 
 emissions <- xx[grepl(pattern = "emiss", x = xx)]
 emission_count <- xx[grepl(pattern = "emiss", x = xx)] %>% length() - 1 # the minus 1 accounts for the fact that there are two co2 emission categories
-
 
 # Figure out the ghg emissions vs the aerosols 
 # The emissions that are immediately used to calculate their respective forcing effect on Hector's energy budget. 
@@ -52,4 +53,4 @@ length(indvidual_rf)
 inputs <- "D_RF_T_ALBEDO|D_RF_MISC|D_RF_VOL"
 modeled_by_hector <- indvidual_rf[!(grepl(pattern = inputs, x = indvidual_rf))]
 modeled_by_hector
-
+length(modeled_by_hector)
