@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.8034758.svg)](https://doi.org/10.5281/zenodo.8034758)
+[![DOI](https://zenodo.org/badge/465728800.svg)](https://zenodo.org/badge/latestdoi/465728800)
 [![Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/badges/latest/active.svg)
 
   
