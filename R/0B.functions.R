@@ -77,3 +77,19 @@ set_params <- function(core, p){
   return(core)
   
 }
+
+
+
+# Normalize temperature to the historical reference period
+# Args 
+#   data: data frame of temperature data
+# Returns a data frame of temperature data normalized to the 1951:1980 reference period
+normalize_to_hadcrut <- function(data){
+  
+  assert_that(unique(data[["variable"]]) == "gmst")
+  
+  ref_value <- mean(data[(data$year %in%  1961:1990), ]$value)
+  data$value <- data$value - ref_value
+  
+  return(data)
+}

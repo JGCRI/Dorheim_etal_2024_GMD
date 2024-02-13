@@ -75,6 +75,21 @@ list.files(CMIP_DIR, pattern = "tos_global", full.names = TRUE) %>%
   select(model, scenario, ensemble, year, sst = value) -> 
   cmip6_global_sst
 
+# This is the only cmip variable that needs to be re referenced 
+cmip6_global_sst %>% 
+  filter(year %in% 1850:1900) %>% 
+  group_by(model, scenario, ensemble) %>% 
+  summarise(ref = mean(sst)) %>% 
+  ungroup -> 
+  ref_tos
+
+cmip6_global_sst %>% 
+  inner_join(ref_tos, by = join_by(model, scenario, ensemble)) %>% 
+  mutate(sst = sst - ref) %>% 
+  select(-ref) -> 
+  cmip6_global_sst
+  
+
 list.files(CMIP_DIR, pattern = "tas_land", full.names = TRUE) %>% 
   read_csv(show_col_types = FALSE) %>% 
   filter(experiment %in% exps) %>% 

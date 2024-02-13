@@ -6,13 +6,16 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 source("R/0B.functions.R")
+source("R/0.constants.R")
+remotes::install_github("JGCRI/hector@dev")
+library(hector)
 
 library(hector)
 version <- packageVersion("hector")
 assertthat::assert_that(version == "3.1.1")
 # Make sure the ini files being used are consistent with the calibration results from 
 # part A. This check was only important before the V3 release.
-source(here::here("R", "0C.check_ini_values.R"))
+#source(here::here("R", "0C.check_ini_values.R"))
 
 # The contents of the IPCC_DIR are the supplemental material figure 10 the cumulative CO2 
 # emissions vs global temperature change
@@ -198,7 +201,8 @@ system.file("input", package = "hector") %>%
   list.files(pattern = "ssp119", full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
-    core <- newcore(inifile = f, name = "historical")
+     core <- prep_core_v3(ini = f, name = "historical")
+   # core <- newcore(inifile = f, name = "historical")
     setvar(core, dates = new_hector_luc_hist$year, var = LUC_EMISSIONS(), 
            values = new_hector_luc_hist$value, unit = "Pg C/yr")
     reset(core)
@@ -227,7 +231,8 @@ system.file("input", package = "hector") %>%
   list.files(pattern = IPCC_scns, full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
-    core <- newcore(inifile = f, name = scn)
+    core <- prep_core_v3(ini = f, name = scn)
+    #core <- newcore(inifile = f, name = scn)
     setvar(core, dates = hist_to_use_with_ssps$year, var = LUC_EMISSIONS(), 
            values = hist_to_use_with_ssps$value, unit = "Pg C/yr")
     reset(core)

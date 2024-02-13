@@ -13,7 +13,7 @@ output:
 
 # Objective 
  
-Prepare the plots and other materials for the supplementary information porition of the Hector v3 manuscript.  
+Prepare the plots and other materials for the supplementary information portion of the Hector v3 manuscript.  
 
 
 # Set Up 
@@ -36,6 +36,8 @@ library(hector)
 
 # Load some custom helpful functions
 source(here::here("R", "0B.functions.R"))
+source(here::here("R", "0.constants.R" ))
+
 
 # Set up the relative paths
 BASE_DIR  <- here::here()
@@ -134,11 +136,11 @@ lo_to_use <- seq(from = 1.54, to = 1.81, length.out = 10)
 # Apply our helper function to the various land ocean warming ratio values and
 # concatenate the results into a single data frame
 results_list <- lapply(lo_to_use, run_with_lo, hc = core)
-hector_lo_results <- do.call(results_list, what = "rbind")
+hector_lo_results <- do.call(results_list, what = "rbind") 
 
-# hector_lo_results %>% 
-#   filter(variable %in% c("global tas (degC)", "land tas (degC)", "sst (degC)")) -> 
-#   hector_lo_results
+hector_lo_results %>%
+  filter(variable %in% c("global tas (degC)", "land tas (degC)", "sst (degC)")) ->
+  hector_lo_results
 
 ggplot(data = hector_lo_results %>% filter(year >= 1900)) +
     geom_line(aes(year, value, color = scenario, group = scenario)) +
@@ -152,7 +154,7 @@ ggplot(data = hector_lo_results %>% filter(year >= 1900)) +
     guides(color = guide_legend(title = "lo ratio")) + 
   labs(title = NULL) -> 
   plot
-
+plot
 ggsave(plot, filename = file.path(FIGS_DIR, "si_lo_ratio.png"), 
        width = MANUSCRIPT_FIG$width, height = MANUSCRIPT_FIG$height)
 ```
