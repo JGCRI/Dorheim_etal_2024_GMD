@@ -56,6 +56,61 @@ file <- paste0("hector_", version, "_ssp.csv")
 write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
 
 
+# Save post spin up values & pre industural values! 
+
+# Years & variables to save. 
+yrs <- 1746
+vars <- c(CONCENTRATIONS_CO2(), GLOBAL_TAS(), HEAT_FLUX(), RF_TOTAL(), RF_ALBEDO(), 
+          RF_CO2(), RF_SO2(), RF_OC(), RF_BC(), LAND_TAS(), SST(), FFI_EMISSIONS(),
+          DACCS_UPTAKE(), LUC_EMISSIONS(), LUC_UPTAKE(), NBP(), OCEAN_UPTAKE(), NPP(), 
+          PH(), GMST(), VEG_C(), DETRITUS_C(), SOIL_C(), PERMAFROST_C(), EARTH_C(), 
+          OCEAN_C(), OCEAN_C_DO(), OCEAN_C_HL(), OCEAN_C_IO(), OCEAN_C_LL(), OCEAN_C_ML(), OCEAN_C_IO())
+params <- c(ECS(), DIFFUSIVITY(), AERO_SCALE(), VOLCANIC_SCALE(), BETA(), Q10_RH())
+
+# Run Hector v3 with the SSP scenarios 
+system.file("input", package = "hector") %>% 
+  list.files(pattern = "hector_ssp245", full.names = TRUE) -> 
+  f 
+    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+    core <- prep_core_v3(f, name = name, inifile = LL_WARNING(), path = ".")
+    run(core)
+    out1 <- fetchvars(core, dates = yrs, vars = vars)
+    out2 <- fetchvars(core, dates = NA, vars = params)
+    fetchvars(core, dates = yrs, vars = c(LUC_EMISSIONS(), NBP())) %>% 
+      group_by(scenario, year, units) %>% 
+      summarise(value = sum(value)) %>% 
+      ungroup %>% 
+      mutate(variable = "land sink") -> 
+      out4
+    out <- rbind(out1, out2, out4)
+
+
+
+rstls %>%  
+  filter(variable %in% c(CONCENTRATIONS_CO2(), VEG_C(), SOIL_C(), DETRITUS_C(), PERMAFROST_C(), EARTH_C(), OCEAN_C(), 
+                         OCEAN_C_DO(), OCEAN_C_LL(), OCEAN_C_HL(), OCEAN_C_IO())) -> 
+  post_spinup
+
+fetchvars(core, dates = NA, vars = c(PREINDUSTRIAL_CO2(), OCEAN_PREIND_C_ID(), OCEAN_PREIND_C_SURF())) -> 
+  prei
+
+post_spinup
+
+prei
+146.60984 +  818.13560 ==  964.7454 
+8784.05959 + 27118.26062 == 37100.00
+
+
+# From the inifiles.... 
+
+vec_C= 550
+d etritus_c = 55
+soil_c = 1782 
+
+
+
+
+
 # 2. Run Concentration Driven RCP Hector --------------------------------------------------------
 # Years & variables to save. 
 yrs <- 1750:2100

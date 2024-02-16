@@ -107,15 +107,16 @@ hector_ssp %>%
 # The cmip6_co2_obs data needs to be split into two categories to indicate the period of time 
 # that was used in the calibration process. 
 cmip6_co2_obs %>% 
-  filter(year < 1959) -> 
-  comparison 
+  filter(year <= 1800) -> 
+  inital_obs
+
 
 cmip6_co2_obs %>% 
-  filter(year >= 1959) -> 
-  calibration 
+  filter(year >= 1800) -> 
+  cmip6_co2_obs
 
 ggplot() + 
-  geom_ribbon(data = cmip6_co2_obs, aes(year, ymin = value - 0.12, ymax = value + 0.12, fill = "Meinshausen et al 2017"), alpha = 0.5) +
+  geom_point(data = inital_obs, aes(year, value, color = "Meinshausen et al 2017")) +
   geom_line(data = cmip6_co2_obs, aes(year, value, color = "Meinshausen et al 2017")) +
   geom_line(data = hector_co2, aes(year, value, color = "Hector V3")) + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
@@ -231,14 +232,39 @@ ggplot() +
   geom_line(data = hadcrut_obs_data, aes(year, value, color = "Morice et al 2021")) + 
   geom_line(data = hector_gmst, aes(year, value, color = "Hector V3"), linewidth = 0.75) + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
-                                "Morice et al 2020" = "black")) + 
+                                "Morice et al 2021" = "black")) + 
   labs(x = "Year", y = expression("Temperature anomaly ("~degree~"C)")) + 
   theme(legend.position = "bottom") -> 
   plot; plot
-
+ big_plot <- plot 
+ 
 ggsave(plot, filename = file.path(FIGS_DIR, "gmst_observations.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 ```
+
+
+```{r}
+
+hector_gmst_decade <- data.frame(value =  rollmean(hector_gmst$value, 10), 
+           year = hector_gmst$year[5:167])
+
+hadcrut_obs_data_decade <- data.frame(value = rollmean(hadcrut_obs_data$value, 10), 
+                                      year = hadcrut_obs_data$year[5:167])
+plot(hector_gmst_decade)
+
+hadcrut_obs_data_decade <- rollmean(hadcrut_obs_data$value, 10)
+
+
+ggplot() + 
+  geom_line(data = hector_gmst_decade, aes(year, value)) + 
+  geom_line(data = hadcrut_obs_data_decade, aes(year, value, color = "d"))
+
+
+
+```
+
+
+
 
 Calculate RMSE and model-observation fit
 
@@ -274,7 +300,16 @@ gmst_wide %>%
   labs(x = expression('Morice et al 2020 GMST ('~degree~"C)"),  
        y = expression('Hector GMST ('~degree~"C)"))
 ```
+```{r}
+hector_gmst %>% 
+  filter(year %in% 2012:2021) %>% 
+  pull(value) %>% mean()
 
+hector_gmst %>% 
+  filter(year %in% 2012:2021) %>% 
+  pull(value) %>% sd()
+
+```
 
 
 
@@ -351,7 +386,7 @@ ggplot() +
   geom_ribbon(data = cmip6_temp_summary, aes(year, ymin = min, ymax = max, fill = id), alpha = 0.9) + 
   geom_line(data = hector_temp, aes(year, value, color = "Hector V3"), size = 1) + 
   facet_grid(scenario~variable, labeller = labeller(variable = temp_labs), scales = "free") + 
-  labs(y = expression("Temperature anomaly relative to 1850-1860 ("~degree~"C)"), x = NULL) + 
+  labs(y = expression("Temperature anomaly relative to 1850-1860 ("~degree~"C)"), x = "Year") + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]])) + 
   scale_fill_manual(values = c("very likely" = "#5A5A5A", 
                                "not very likely" = "#D3D3D3")) + 
@@ -371,7 +406,7 @@ ggplot() +
   geom_line(data = cmip6_rslts, aes(year, value, group = interaction(model), color = "CMIP6 ESM"), alpha = 0.5) + 
   geom_line(data = hector_temp, aes(year, value, color = "Hector V3"),) + 
   facet_grid(scenario~variable, labeller = labeller(variable = temp_labs), scales = "free") + 
-  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = NULL) + 
+  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = "Year") + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]], 
                                 "CMIP6 ESM" = "#5A5A5A")) + 
   theme(panel.grid.minor.x = element_blank(), 
@@ -417,14 +452,16 @@ hector_idealized <- read.csv(file.path(HECTOR_RSLTS_DIR, "hector_3.1.1_idealized
   filter(variable == GLOBAL_TAS()) %>% 
   mutate(scenario = if_else(scenario ==  "abruptx4CO2", "abrupt-4xCO2", scenario)) %>% 
   filter(year <= max_yr)
-cmip6_idealized <- read.csv(here::here("data", "cmip", "CMIP6_idealized_tas_global.csv")) %>% 
+cmip6_idealized <- read.csv(here::here("data", "cmip6_idealized.csv")) %>% 
   filter(year <= max_yr) %>% 
   rename(scenario = experiment)
 
 
 ggplot() + 
-  geom_line(data = cmip6_idealized, aes(year, value, group = interaction(model, ensemble), color = "CMIP6 ESM"), alpha = 0.5) + 
-  geom_line(data = hector_idealized, aes(year, value, color = "Hector V3"), linewidth = 1) + 
+  geom_line(data = cmip6_idealized, aes(year, value, group = interaction(model, ensemble),
+                                        color = "CMIP6 ESM"), alpha = 0.5) + 
+  geom_line(data = hector_idealized, aes(year, value, color = "Hector V3"), 
+            linewidth = 1) + 
   facet_wrap("scenario", scales = "free") + 
   labs(y = expression("Temperature anomaly ("~degree~"C)"), x = NULL) + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]], 
@@ -510,8 +547,30 @@ hector_ssp %>%
   select(-x)
 ```
 
-# Hector's contemporary state (e.g. magnitude of land and ocean sinks, ocean pH, NPP, etc)
 
+# Hector's Post Spin Up State 
+
+```{r}
+# The post spin up C cycle values come from the ocean.log/simpelN.log file and the 
+# the ini files. 
+variables = c(VEG_C(), 
+              DETRITUS_C(), 
+              SOIL_C(), 
+              PERMAFROST_C(), 
+              CONCENTRATIONS_CO2(), 
+              OCEAN_PREIND_C_ID(), 
+              OCEAN_PREIND_C_SURF())
+post_spinup = 
+  c(562, 62.3489, 2030.59, 865, 277.15, 27118.3 + 8784.06, 146.61 + 818.131)
+inital_pools = c(550, 55, 1782, 865, 277.15, 37100, 900)
+
+data.frame(variables, inital_pools, post_spinup) %>% 
+  mutate(dif = inital_pools - post_spinup) %>% 
+  write.csv(file.path(OUTPUT_DIR, "inital_carbon_pools.csv"), row.names = FALSE)
+```
+
+
+# Hector's contemporary state (e.g. magnitude of land and ocean sinks, ocean pH, NPP, etc)
 
 ## GCP Land Sink
 
