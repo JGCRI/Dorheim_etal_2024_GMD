@@ -30,6 +30,8 @@ library(ggplot2)
 library(tidyr)
 library(readr)
 library(readxl)
+library(zoo)
+
 library(hector)
 hector_version <- packageVersion("hector")
 assertthat::assert_that(hector_version == "3.1.1")
@@ -229,10 +231,10 @@ hector_ssp %>%
 
 ggplot() + 
   geom_ribbon(data = hadcrut_obs_data, aes(year, ymin = lower, ymax = upper), alpha = 0.4) + 
-  geom_line(data = hadcrut_obs_data, aes(year, value, color = "Morice et al 2021")) + 
+  geom_line(data = hadcrut_obs_data, aes(year, value, color = "Morice et al., 2021")) + 
   geom_line(data = hector_gmst, aes(year, value, color = "Hector V3"), linewidth = 0.75) + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
-                                "Morice et al 2021" = "black")) + 
+                                "Morice et al., 2021" = "black")) + 
   labs(x = "Year", y = expression("Temperature anomaly ("~degree~"C)")) + 
   theme(legend.position = "bottom") -> 
   plot; plot
@@ -246,20 +248,34 @@ ggsave(plot, filename = file.path(FIGS_DIR, "gmst_observations.png"),
 ```{r}
 
 hector_gmst_decade <- data.frame(value =  rollmean(hector_gmst$value, 10), 
+                                 sd = rollapply(hector_gmst$value, width = 10, FUN=sd), 
            year = hector_gmst$year[5:167])
 
 hadcrut_obs_data_decade <- data.frame(value = rollmean(hadcrut_obs_data$value, 10), 
+                                      sd = rollapply(hadcrut_obs_data$value, width = 10, FUN=sd),
                                       year = hadcrut_obs_data$year[5:167])
-plot(hector_gmst_decade)
 
-hadcrut_obs_data_decade <- rollmean(hadcrut_obs_data$value, 10)
+
 
 
 ggplot() + 
-  geom_line(data = hector_gmst_decade, aes(year, value)) + 
-  geom_line(data = hadcrut_obs_data_decade, aes(year, value, color = "d"))
+  geom_line(data = hadcrut_obs_data_decade, aes(year, value, color = "Morice et al., 2021")) + 
+  geom_ribbon(data = hadcrut_obs_data_decade, aes(year, ymin = value - abs(sd), ymax = value + abs(sd), 
+                                                  fill = "Morice et al., 2021"), alpha = 0.2) + 
+  geom_line(data = hector_gmst_decade, aes(year, value, color = "Hector V3"), linewidth = 0.75) + 
+    geom_ribbon(data = hector_gmst_decade, aes(year, ymin = value - abs(sd), ymax = value + abs(sd), 
+                                                  fill = "Hector V3"), alpha = 0.4) + 
+  scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
+                                "Morice et al., 2021" = "black")) + 
+  scale_fill_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
+                                "Morice et al., 2021" = "black")) + 
+  labs(x = NULL, y = NULL) + 
+  theme(legend.position = "none") -> 
+  mini_plot
+  
 
-
+ggsave(mini_plot, filename = file.path(FIGS_DIR, "gmst_observations-min.png"), 
+       width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 
 ```
 
@@ -406,13 +422,13 @@ ggplot() +
   geom_line(data = cmip6_rslts, aes(year, value, group = interaction(model), color = "CMIP6 ESM"), alpha = 0.5) + 
   geom_line(data = hector_temp, aes(year, value, color = "Hector V3"),) + 
   facet_grid(scenario~variable, labeller = labeller(variable = temp_labs), scales = "free") + 
-  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = "Year") + 
+  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = "Years") + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]], 
                                 "CMIP6 ESM" = "#5A5A5A")) + 
   theme(panel.grid.minor.x = element_blank(), 
         panel.grid.minor.y = element_blank(), 
         legend.position = "bottom") + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) -> 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) -> 
   plot; plot
 
 
@@ -463,13 +479,13 @@ ggplot() +
   geom_line(data = hector_idealized, aes(year, value, color = "Hector V3"), 
             linewidth = 1) + 
   facet_wrap("scenario", scales = "free") + 
-  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = NULL) + 
+  labs(y = expression("Temperature anomaly ("~degree~"C)"), x = "Years") + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]], 
                                 "CMIP6 ESM" = "#5A5A5A")) + 
   theme(panel.grid.minor.x = element_blank(), 
         panel.grid.minor.y = element_blank(), 
         legend.position = "bottom") + 
-  theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) -> 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, hjust=1)) -> 
   plot; plot
 
 
