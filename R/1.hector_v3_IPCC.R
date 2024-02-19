@@ -1,21 +1,22 @@
 # Objective: Import and format the IPCC results to simplify the manuscript analyses and figures 
 # code. Because the IPCC report and Hector default scenarios used different historical LUC 
 # emissions in this script we have to back engineer these emissions to use in Hector.
-# 0. Set Up ----------------------------------------------------------------------------
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-source("R/0B.functions.R")
-source("R/0.constants.R")
-remotes::install_github("JGCRI/hector@dev")
-library(hector)
+# 0. Set Up --------------------------------------------------------------------------------
+# Set up environment. 
+source(here::here("R", "0.set_up.R"))
+source(file.path(BASE_DIR, "R", "0.functions.R"))
 
-library(hector)
-version <- packageVersion("hector")
-assertthat::assert_that(version == "3.1.1")
-# Make sure the ini files being used are consistent with the calibration results from 
-# part A. This check was only important before the V3 release.
-#source(here::here("R", "0C.check_ini_values.R"))
+# Indicator function to determine if using the hector package ini files or if
+# we should be using the prep_core function that will use the calibration 
+# rda objects created from "R/0A.hectorv3_calibration.R"
+use_pkg_ini <- TRUE
+
+if(use_pkg_ini){
+  my_newcore <- newcore
+} else {
+  my_newcore <- prep_core_v3
+}
+
 
 # The contents of the IPCC_DIR are the supplemental material figure 10 the cumulative CO2 
 # emissions vs global temperature change
@@ -201,7 +202,7 @@ system.file("input", package = "hector") %>%
   list.files(pattern = "ssp119", full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
-     core <- prep_core_v3(ini = f, name = "historical")
+     core <- my_newcore(ini = f, name = "historical")
    # core <- newcore(inifile = f, name = "historical")
     setvar(core, dates = new_hector_luc_hist$year, var = LUC_EMISSIONS(), 
            values = new_hector_luc_hist$value, unit = "Pg C/yr")
@@ -231,8 +232,7 @@ system.file("input", package = "hector") %>%
   list.files(pattern = IPCC_scns, full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
-    core <- prep_core_v3(ini = f, name = scn)
-    #core <- newcore(inifile = f, name = scn)
+    core <- my_newcore(ini = f, name = scn)
     setvar(core, dates = hist_to_use_with_ssps$year, var = LUC_EMISSIONS(), 
            values = hist_to_use_with_ssps$value, unit = "Pg C/yr")
     reset(core)
@@ -303,5 +303,5 @@ final_hector_cumsum_co2 %>%
   inner_join(gmst_normalized, by = c("year", "scenario")) ->
   hector_co2_tas
 
-file  <- paste0("hector_", version, "_IPCCemiss_co2_tas.csv")
+file  <- paste0("hector_", HECTOR_VERSION, "_IPCCemiss_co2_tas.csv")
 write.csv(hector_co2_tas, file = here::here("output", "hector_output", file), row.names = FALSE)

@@ -1,13 +1,20 @@
 # Objective: Scrape the Hector C++ code base & the input tables for information to include in the manuscript
 
 # 0. Set Up -----------------------------------------------------------------------------------------------------
-library(dplyr)
-# Load project functions and constants. 
-source(here::here("R", "0.constants.R"))
-source(file.path(BASE_DIR, "R", "0B.functions.R"))
-library(hector)
-version <- packageVersion("hector")
-assertthat::assert_that(version == HECTOR_VERSION)
+# Set up environment. 
+source(here::here("R", "0.set_up.R"))
+source(file.path(BASE_DIR, "R", "0.functions.R"))
+
+# Indicator function to determine if using the hector package ini files or if
+# we should be using the prep_core function that will use the calibration 
+# rda objects created from "R/0A.hectorv3_calibration.R"
+use_pkg_ini <- TRUE
+
+if(use_pkg_ini){
+  my_newcore <- newcore
+} else {
+  my_newcore <- prep_core_v3
+}
 
 
 # 1. Emissions -----------------------------------------------------------------------------------------------------

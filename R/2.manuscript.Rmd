@@ -23,28 +23,14 @@ knitr::opts_chunk$set(echo = FALSE, error = FALSE, message = FALSE)
 ```
 
 ```{r, warning=FALSE, message = FALSE, echo=TRUE}
-library(assertthat)
-library(data.table)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(readr)
-library(readxl)
-library(zoo)
-
-library(hector)
-hector_version <- packageVersion("hector")
-assertthat::assert_that(hector_version == "3.1.1")
-# TODO check the parameters 
-
 # Load some custom helpful functions
-source(here::here("R", "0B.functions.R"))
+source(here::here("R", "0.set_up.R"))
+source(here::here("R", "0.functions.R"))
 
 # Set up the relative paths
-BASE_DIR  <- here::here()
-FIGS_DIR  <- here::here("output", "figures")
-INPUT_DIR <- here::here("data")
-HECTOR_RSLTS_DIR <- here::here("output", "hector_output")
+FIGS_DIR  <- file.path(BASE_DIR, "output", "figures")
+INPUT_DIR <- file.path(BASE_DIR, "data")
+HECTOR_RSLTS_DIR <- file.path(BASE_DIR, "output", "hector_output")
 
 # Define some overall figure aesthetics
 THEME_BASE_SIZE <- 10
@@ -59,6 +45,8 @@ SSP_COLORS <- c("ssp119" = "#00a9cf", "ssp126" = "#003466", "ssp245" = "#f69320"
                 "ssp370" = "#df0000", "ssp434" = "#2274ae","ssp460" = "#b0724e",
                 "ssp585"= "#980002", "historical" = "#000000", "historical"="#92397a")
 OBS_SCHEME <- c("obs" = "grey", "Hector v3" = "#E69F00")
+
+hector_version <- HECTOR_VERSION
 ```
 
 ## Load Hector Results
@@ -149,7 +137,7 @@ hector_co2 %>%
 ```
 
 
-RMSE over the full observational period. 
+RMSE between Hector and observations. 
 
 ```{r}
 # Calculate the RMSE 
@@ -181,16 +169,6 @@ summary(fit)
 ## Global Mean Surface Temperature 
 
 ```{r}
-# # Lenssen, N., G. Schmidt, J. Hansen, M. Menne, A. Persin, R. Ruedy, and D. Zyss, 2019: 
-# # Improvements in the GISTEMP uncertainty model. J. Geophys. Res. Atmos., 124, no. 12, 
-# # 6307-6326, doi:10.1029/2018JD029522.
-# read.csv(here::here("data", "calibration", "GISTEMP_v4_20221014.csv"), skip = 1) %>% 
-#   select(year = Year, value = `J.D`) %>% 
-#   mutate(value = as.numeric(value)) %>% 
-#   na.omit() %>% 
-#   mutate(variable = "gmst") -> 
-#   gmst_obs_data
-
 # Hadcrut5
 # Global mean surface temperature anomaly
 # https://www.metoffice.gov.uk/hadobs/hadcrut5/data/current/download.html
@@ -238,24 +216,22 @@ ggplot() +
   labs(x = "Year", y = expression("Temperature anomaly ("~degree~"C)")) + 
   theme(legend.position = "bottom") -> 
   plot; plot
- big_plot <- plot 
- 
+big_plot <- plot 
+
 ggsave(plot, filename = file.path(FIGS_DIR, "gmst_observations.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 ```
 
+Make the inset figure. 
 
 ```{r}
-
 hector_gmst_decade <- data.frame(value =  rollmean(hector_gmst$value, 10), 
                                  sd = rollapply(hector_gmst$value, width = 10, FUN=sd), 
-           year = hector_gmst$year[5:167])
+                                 year = hector_gmst$year[5:167])
 
 hadcrut_obs_data_decade <- data.frame(value = rollmean(hadcrut_obs_data$value, 10), 
                                       sd = rollapply(hadcrut_obs_data$value, width = 10, FUN=sd),
                                       year = hadcrut_obs_data$year[5:167])
-
-
 
 
 ggplot() + 
@@ -263,16 +239,16 @@ ggplot() +
   geom_ribbon(data = hadcrut_obs_data_decade, aes(year, ymin = value - abs(sd), ymax = value + abs(sd), 
                                                   fill = "Morice et al., 2021"), alpha = 0.2) + 
   geom_line(data = hector_gmst_decade, aes(year, value, color = "Hector V3"), linewidth = 0.75) + 
-    geom_ribbon(data = hector_gmst_decade, aes(year, ymin = value - abs(sd), ymax = value + abs(sd), 
-                                                  fill = "Hector V3"), alpha = 0.4) + 
+  geom_ribbon(data = hector_gmst_decade, aes(year, ymin = value - abs(sd), ymax = value + abs(sd), 
+                                             fill = "Hector V3"), alpha = 0.4) + 
   scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
                                 "Morice et al., 2021" = "black")) + 
   scale_fill_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
-                                "Morice et al., 2021" = "black")) + 
+                               "Morice et al., 2021" = "black")) + 
   labs(x = NULL, y = NULL) + 
   theme(legend.position = "none") -> 
   mini_plot
-  
+
 
 ggsave(mini_plot, filename = file.path(FIGS_DIR, "gmst_observations-min.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
@@ -280,7 +256,7 @@ ggsave(mini_plot, filename = file.path(FIGS_DIR, "gmst_observations-min.png"),
 ```
 
 
-
+TODO add code to add the inset figure to the bigger figure. 
 
 Calculate RMSE and model-observation fit
 
@@ -324,12 +300,14 @@ hector_gmst %>%
 hector_gmst %>% 
   filter(year %in% 2012:2021) %>% 
   pull(value) %>% sd()
-
 ```
 
 
 
 # CMIP6 Comparison 
+
+Make a plot with the ESMs colored by their ECS labels. 
+
 
 ```{r}
 scns <- c("ssp245", "ssp126", "ssp585")
@@ -509,9 +487,8 @@ colors_to_use <- SSP_COLORS[names(SSP_COLORS) %in% ipcc_data$scenario]
 ggplot() +
   geom_ribbon(data = ipcc_data, aes(co2, ymin = min, 
                                     ymax = max, fill = scenario), alpha = 0.1) + 
-  #geom_line(data = ipcc_data, aes(co2, mean, group = scenario, color = "IPCC", linetype = "IPCC")) +
   geom_line(data = ipcc_data, aes(co2, obs, color = "Obs", linetype = "Observations")) +
-  geom_line(data = hector_tas_v_co2, aes(co2, gmst, color = scenario), size = 0.75) +
+  geom_line(data = hector_tas_v_co2, aes(co2, gmst, color = scenario), linewidth = 0.75) +
   scale_fill_manual(values = colors_to_use) + 
   scale_color_manual(values = colors_to_use) + 
   labs(y = expression("Temperature anomaly relative to 1850-1900 ("~degree~"C)"),
@@ -582,7 +559,7 @@ inital_pools = c(550, 55, 1782, 865, 277.15, 37100, 900)
 
 data.frame(variables, inital_pools, post_spinup) %>% 
   mutate(dif = inital_pools - post_spinup) %>% 
-  write.csv(file.path(OUTPUT_DIR, "inital_carbon_pools.csv"), row.names = FALSE)
+  write.csv(file.path(HECTOR_RSLTS_DIR, "inital_carbon_pools.csv"), row.names = FALSE)
 ```
 
 

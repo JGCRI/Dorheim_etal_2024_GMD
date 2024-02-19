@@ -2,24 +2,19 @@
 # Hector parameter values for diff (ocean heat diffusitivty), q10_rh (temperature effects 
 # on heterotrophic respiration), and beta (the CO2 fertilization factor). This 
 # script only needs to be run once in order to determine the new default Hector parameters. 
-# After this script is completed the default ini files included in the Hector package 
-# will need to be updated accordingly. 
+# The results from this script will be used to update the ini files! Updating the 
+# ini files needs to be done manually (TODO figure out a way to update all parameter
+# ini files in some reproducible manner). 
+
 # 0. Set up -------------------------------------------------------------------------------------------
 # The required packages 
-library(assertthat)
-library(data.table)
-library(dplyr)
-library(ggplot2)
-
-# Read in the project constants (root directory name and the Hector pacakge version 
-# that should be used). 
+source("R/0.set_up.R")
 source("R/0.constants.R")
 
 # Make sure the correct version of Hector is being used. 
 remotes::install_github("JGCRI/hector@dev")
 library(hector) 
 assert_that(packageVersion("hector") ==  HECTOR_VERSION)
-
 
 
 # 1. Adjust natural CH4 and N2O emissions -------------------------------------------------------------------------------------------
@@ -134,10 +129,6 @@ optim_nat_hector <- function(comp_data, par){
 par <- c(5, 300)
 names(par) <- c("nat_n2o", "nat_ch4")
 natural_emiss_fit <- optim(par = par, fn = optim_nat_hector, comp_data = ar6_results)
-natural_emiss_fit$par 
-# On Feb 11 2024
-# nat_n2o    nat_ch4 
-# 9.724528 335.077324 
 
 save(natural_emiss_fit,
      file = file.path(BASE_DIR, "output", paste0("calibration-natemissions-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
@@ -223,24 +214,6 @@ prep_core <- function(filename){
 
 # Import and format the comparison data!
 
-# # GISTEMP Analysis (the GISS Surface Temperature Analysis)
-# # For the GISS analysis, normal always means the average over 
-# # the 30-year period 1951-1980 for that place and time of year.
-# # This base period is specific to GISS, not universal. 
-# # 
-# # GISTEMP Team, 2022: GISS Surface Temperature Analysis (GISTEMP), version 4.
-# # NASA Goddard Institute for Space Studies. Dataset accessed 20YY-MM-DD at https://data.giss.nasa.gov/gistemp/.
-# #
-# # Lenssen, N., G. Schmidt, J. Hansen, M. Menne, A. Persin, R. Ruedy, and D. Zyss, 2019: 
-# # Improvements in the GISTEMP uncertainty model. J. Geophys. Res. Atmos., 124, no. 12, 
-# # 6307-6326, doi:10.1029/2018JD029522.
-# read.csv(here::here("data", "calibration", "GISTEMP_v4_20221014.csv"), skip = 1) %>% 
-#   select(year = Year, value = `J.D`) %>% 
-#   mutate(value = as.numeric(value)) %>% 
-#   na.omit() %>% 
-#   mutate(variable = "gmst") -> 
-#   gmst_obs_data
-
 # Hadcrut5
 # Global mean surface temperature anomaly
 # https://www.metoffice.gov.uk/hadobs/hadcrut5/data/current/download.html
@@ -254,6 +227,7 @@ here::here("data", "HadCRUT5.csv") %>%
   read.csv(stringsAsFactors = FALSE) %>% 
   na.omit ->
   hadcrut_obs_data
+
 names(hadcrut_obs_data) <- c("year", "value", "lower", "upper")
 hadcrut_obs_data$variable <- "gmst"
 gmst_obs_data <- hadcrut_obs_data
@@ -329,6 +303,7 @@ params <- c("diff" = 2.3,
            "q10_rh" = 2.2,
             "beta" = 0.5)
 
+# Set the bounds for the potential parameters based off of Brown et. al 2024
 sd <- c(0.1, 0.44, 0.232)
 lower <- params - sd
 upper <- params + sd

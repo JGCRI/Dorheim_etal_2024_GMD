@@ -2,17 +2,20 @@
 # the manuscript. 
 
 # 0. Set Up --------------------------------------------------------------------------------
-library(assertthat)
-library(dplyr)
-library(tidyr)
+# Set up environment. 
+source(here::here("R", "0.set_up.R"))
+source(file.path(BASE_DIR, "R", "0.functions.R"))
 
-# Load project functions and constants. 
-source(here::here("R", "0.constants.R"))
-source(file.path(BASE_DIR, "R", "0B.functions.R"))
-remotes::install_github("JGCRI/hector@dev")
-library(hector)
-version <- packageVersion("hector")
-assertthat::assert_that(version == HECTOR_VERSION)
+# Indicator function to determine if using the hector package ini files or if
+# we should be using the prep_core function that will use the calibration 
+# rda objects created from "R/0A.hectorv3_calibration.R"
+use_pkg_ini <- TRUE
+
+if(use_pkg_ini){
+  my_newcore <- newcore
+} else {
+  my_newcore <- prep_core_v3
+}
 
 # Make sure the ini files being used are consistent with the calibration results from 
 # part A. This check was only important before the V3 release.
@@ -33,7 +36,7 @@ system.file("input", package = "hector") %>%
   list.files(pattern = "ssp", full.names = TRUE) %>% 
   lapply(function(f){
     name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
-    core <- prep_core_v3(f, name = name)
+    core <- my_newcore(f, name = name)
     run(core)
     out1 <- fetchvars(core, dates = yrs, vars = vars)
     out2 <- fetchvars(core, dates = NA, vars = params)
@@ -56,7 +59,7 @@ file <- paste0("hector_", version, "_ssp.csv")
 write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
 
 
-# Save post spin up values & pre industural values! 
+# Save post spin up values & pre industrial values! 
 
 # Years & variables to save. 
 yrs <- 1746
@@ -71,45 +74,18 @@ params <- c(ECS(), DIFFUSIVITY(), AERO_SCALE(), VOLCANIC_SCALE(), BETA(), Q10_RH
 system.file("input", package = "hector") %>% 
   list.files(pattern = "hector_ssp245", full.names = TRUE) -> 
   f 
-    name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
-    core <- prep_core_v3(f, name = name, inifile = LL_WARNING(), path = ".")
-    run(core)
-    out1 <- fetchvars(core, dates = yrs, vars = vars)
-    out2 <- fetchvars(core, dates = NA, vars = params)
-    fetchvars(core, dates = yrs, vars = c(LUC_EMISSIONS(), NBP())) %>% 
-      group_by(scenario, year, units) %>% 
-      summarise(value = sum(value)) %>% 
-      ungroup %>% 
-      mutate(variable = "land sink") -> 
-      out4
-    out <- rbind(out1, out2, out4)
-
-
-
-rstls %>%  
-  filter(variable %in% c(CONCENTRATIONS_CO2(), VEG_C(), SOIL_C(), DETRITUS_C(), PERMAFROST_C(), EARTH_C(), OCEAN_C(), 
-                         OCEAN_C_DO(), OCEAN_C_LL(), OCEAN_C_HL(), OCEAN_C_IO())) -> 
-  post_spinup
-
-fetchvars(core, dates = NA, vars = c(PREINDUSTRIAL_CO2(), OCEAN_PREIND_C_ID(), OCEAN_PREIND_C_SURF())) -> 
-  prei
-
-post_spinup
-
-prei
-146.60984 +  818.13560 ==  964.7454 
-8784.05959 + 27118.26062 == 37100.00
-
-
-# From the inifiles.... 
-
-vec_C= 550
-d etritus_c = 55
-soil_c = 1782 
-
-
-
-
+name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
+core <- my_newcore(f, name = name)
+run(core)
+out1 <- fetchvars(core, dates = yrs, vars = vars)
+out2 <- fetchvars(core, dates = NA, vars = params)
+fetchvars(core, dates = yrs, vars = c(LUC_EMISSIONS(), NBP())) %>% 
+  group_by(scenario, year, units) %>% 
+  summarise(value = sum(value)) %>% 
+  ungroup %>% 
+  mutate(variable = "land sink") -> 
+  out4
+out <- rbind(out1, out2, out4)
 
 # 2. Run Concentration Driven RCP Hector --------------------------------------------------------
 # Years & variables to save. 
@@ -124,7 +100,7 @@ system.file("input", package = "hector") %>%
   list.files(pattern = "ssp", full.names = TRUE)  %>%
   lapply(function(ini_file){
     scn <- gsub(x = basename(ini_file), pattern = "hector_|.ini", replacement = "" )
-    hc <- prep_core_v3(ini_file, name = scn)
+    hc <- my_newcore(ini_file, name = scn)
     csv_file <- list.files(file.path(dirname(ini_file), "tables"), pattern = scn, full.names = TRUE)
     data <- read.csv(csv_file, comment.char = ";")
     
@@ -143,7 +119,7 @@ system.file("input", package = "hector") %>%
       conc_inputs_hc
     
     name <- paste0(gsub(pattern = "hector_|.ini", replacement = "", x = basename(ini_file)), " conc")
-    hc <- prep_core_v3(ini_file, name = scn)
+    hc <- my_newcore(ini_file, name = scn)
     
     split(conc_inputs_hc, conc_inputs_hc$name) %>% 
       lapply(function(d){
@@ -170,7 +146,7 @@ rstls$version <- version
 
 file <- paste0("hector_", version, "_ssp-conc.csv")
 write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
-  
+
 
 # 3. Idealized Runs -----------------------------------------------------------
 
@@ -185,7 +161,7 @@ params <- c(ECS(), DIFFUSIVITY(), AERO_SCALE(), VOLCANIC_SCALE(), BETA(), Q10_RH
 here::here("data",  "idealized_inputs", "hector_1pctCO2.ini") %>%  
   lapply(function(f){
     name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
-    core <- prep_core_v3(f, name = name)
+    core <- my_newcore(f, name = name)
     run(core)
     out1 <- fetchvars(core, dates = 1750:2070, vars = vars)
     out2 <- fetchvars(core, dates = NA, vars = params)
@@ -207,7 +183,7 @@ rstls_1pcCO2$year <- rstls_1pcCO2$year - 1800
 here::here("data",  "idealized_inputs", "hector_abruptx4CO2.ini") %>%  
   lapply(function(f){
     name <- gsub(pattern = "hector_|.ini", replacement = "", x = basename(f))
-    core <- prep_core_v3(f, name = name)
+    core <- my_newcore(f, name = name)
     run(core)
     out1 <- fetchvars(core, dates = 1750:2070, vars = vars)
     out2 <- fetchvars(core, dates = NA, vars = params)
@@ -233,3 +209,16 @@ rstls$version <- version
 file <- paste0("hector_", version, "_idealized.csv")
 write.csv(rstls, file = file.path(OUTPUT_DIR, file), row.names = FALSE)
 
+
+# 4. Spin Up Information -------------------------------------------------------
+# Run Hector with the settings to write the logs out to disk which will then 
+# be used to determine the post spin up information. Note that the log files 
+# will be written out to the current working directory. 
+
+setwd(file.path(BASE_DIR, "output", "hector_output"))
+inifile <- system.file(package = "hector", "input/hector_ssp245.ini")
+hc <- my_newcore(inifile = inifile, 
+                 loglevel = LL_DEBUG(), 
+                 suppresslogging = FALSE)
+run(hc)
+setwd(BASE_DIR)

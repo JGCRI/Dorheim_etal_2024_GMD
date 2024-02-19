@@ -24,27 +24,26 @@ knitr::opts_chunk$set(echo = FALSE, error = FALSE, message = FALSE)
 ```
 
 ```{r, warning=FALSE, message = FALSE, echo=TRUE}
-library(assertthat)
-library(data.table)
-library(dplyr)
-library(ggplot2)
-library(tidyr)
-library(readr)
-library(readxl)
-library(hector)
-#devtools::load_all("~/projects/Hector-Versions/v3/hector/")
+# Set up environment. 
+source(here::here("R", "0.set_up.R"))
+source(file.path(BASE_DIR, "R", "0.functions.R"))
 
-# Load some custom helpful functions
-source(here::here("R", "0B.functions.R"))
-source(here::here("R", "0.constants.R" ))
+# Indicator function to determine if using the hector package ini files or if
+# we should be using the prep_core function that will use the calibration 
+# rda objects created from "R/0A.hectorv3_calibration.R"
+use_pkg_ini <- TRUE
 
+if(use_pkg_ini){
+  my_newcore <- newcore
+} else {
+  my_newcore <- prep_core_v3
+}
 
 # Set up the relative paths
 BASE_DIR  <- here::here()
 FIGS_DIR  <- here::here("output", "figures")
 INPUT_DIR <- here::here("data")
 HECTOR_RSLTS_DIR <- here::here("output", "hector_output")
-#HECTOR_DATA_DIR <- "~/Documents/2022/hectordata/"
 
 # Define some overall figure aesthetics
 THEME_BASE_SIZE <- 10
@@ -70,7 +69,7 @@ vars_to_keep <- c(GLOBAL_TAS(), LAND_TAS(), SST(), CONCENTRATIONS_CO2(), RH(), O
 
 inifile <- file.path(system.file("input", package = "hector"), "hector_ssp245.ini")
 
-core    <- newcore(inifile)
+core    <- my_newcore(inifile)
 reset(core)
 run(core, max(years_to_keep))
 out1 <- fetchvars(core, years_to_keep, vars_to_keep)
