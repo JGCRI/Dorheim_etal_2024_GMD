@@ -2,11 +2,8 @@
 # https://github.com/JGCRI/hector_cmip6data 
 # into ready to plot/analyze data for the manuscript. 
 # 0. Set Up ----------------------------------------------------------------
-library(dplyr)
-library(hector)
-source("R/0.constants.R")
+source("R/0.set_up.R")
 CMIP_DIR <- file.path(BASE_DIR, "data", "cmip")
-
 
 # Concatenate the historical and the future scenario results 
 # this creates a continuous time series between the historical 
@@ -48,8 +45,8 @@ paste_historical <- function(data){
 exps <- c("ssp126", "ssp245", "ssp370", "ssp585", "ssp119", 
           "ssp434", "ssp460", "historical")
 
-# 1. Load Data ------------------------------------------------------------------
-list.files(CMIP_DIR, pattern = "tas_global", full.names = TRUE) %>% 
+# 1. Load Data (future scenarios) ----------------------------------------------
+list.files(CMIP_DIR, pattern = "cmip6_annual_tas_global", full.names = TRUE) %>% 
   read.csv %>% 
   filter(experiment %in% exps) %>% 
   rename(scenario = experiment) %>% 
@@ -75,6 +72,21 @@ list.files(CMIP_DIR, pattern = "tos_global", full.names = TRUE) %>%
   select(model, scenario, ensemble, year, sst = value) -> 
   cmip6_global_sst
 
+# This is the only cmip variable that needs to be re referenced 
+cmip6_global_sst %>% 
+  filter(year %in% 1850:1900) %>% 
+  group_by(model, scenario, ensemble) %>% 
+  summarise(ref = mean(sst)) %>% 
+  ungroup -> 
+  ref_tos
+
+cmip6_global_sst %>% 
+  inner_join(ref_tos, by = join_by(model, scenario, ensemble)) %>% 
+  mutate(sst = sst - ref) %>% 
+  select(-ref) -> 
+  cmip6_global_sst
+  
+
 list.files(CMIP_DIR, pattern = "tas_land", full.names = TRUE) %>% 
   read_csv(show_col_types = FALSE) %>% 
   filter(experiment %in% exps) %>% 
@@ -89,7 +101,7 @@ list.files(CMIP_DIR, pattern = "tas_land", full.names = TRUE) %>%
   cmip6_global_land
   
 
-# 2. Format Data ------------------------------------------------------------------
+# 2. Format Data (future scenarios) --------------------------------------------
 # Join the data frames together to make wide df to make sure we have full coverage.
 cmip6_global_tas %>% 
   inner_join(cmip6_global_sst, by = c("model", "year", "ensemble", "scenario")) %>% 
@@ -101,12 +113,40 @@ ids <- which(!names(wide_tas_df) %in% c("model", "scenario", "ensemble", "year")
 wide_tas_df %>% 
   pivot_longer(ids, 
                names_to = "variable", 
-               values_to = "value") %>% 
-  group_by(model, scenario, year, variable) %>% 
-  summarise(value = mean(value))  %>% 
-  ungroup ->
-  cmip6_model_means
+               values_to = "value") -> 
+  long_tas_df
 
-write.csv(cmip6_model_means, file = here::here("data", "cmip6_model_means.csv"), 
-          row.names = FALSE)
+
+split(long_tas_df, long_tas_df$model) %>% 
+  lapply(function(d){
+    
+    ens <- sort(unique(d$ensemble))[[1]]
+    out <- filter(d, ensemble == ens)
+    return(out)
+    
+  }) %>% 
+  do.call(what = "rbind") -> 
+  cmip6_model_rslts
   
+write.csv(cmip6_model_rslts, file = here::here("data", "cmip6_model_means.csv"), 
+          row.names = FALSE)
+
+  
+# 3. Format/Prep Idealized Scenarios -------------------------------------------
+list.files(CMIP_DIR, "CMIP6_idealized_tas_global.csv", full.names = TRUE) %>% 
+  read.csv -> 
+  CMIP6_idealized
+
+split(CMIP6_idealized, CMIP6_idealized$model) %>% 
+  lapply(function(d){
+    
+    ens <- sort(unique(d$ensemble))[[1]]
+    out <- filter(d, ensemble == ens)
+    return(out)
+    
+  }) %>% 
+  do.call(what = "rbind") -> 
+  CMIP6_idealized
+
+write.csv(CMIP6_idealized, file = here::here("data", "cmip6_idealized.csv"), 
+          row.names = FALSE)

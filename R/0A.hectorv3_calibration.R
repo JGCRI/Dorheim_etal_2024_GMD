@@ -2,24 +2,19 @@
 # Hector parameter values for diff (ocean heat diffusitivty), q10_rh (temperature effects 
 # on heterotrophic respiration), and beta (the CO2 fertilization factor). This 
 # script only needs to be run once in order to determine the new default Hector parameters. 
-# After this script is completed the default ini files included in the Hector package 
-# will need to be updated accordingly. 
+# The results from this script will be used to update the ini files! Updating the 
+# ini files needs to be done manually (TODO figure out a way to update all parameter
+# ini files in some reproducible manner). 
+
 # 0. Set up -------------------------------------------------------------------------------------------
 # The required packages 
-library(assertthat)
-library(data.table)
-library(dplyr)
-library(ggplot2)
-
-# Read in the project constants (root directory name and the Hector pacakge version 
-# that should be used). 
+source("R/0.set_up.R")
 source("R/0.constants.R")
 
 # Make sure the correct version of Hector is being used. 
-remotes::install_github("JGCRI/hector")
+remotes::install_github("JGCRI/hector@dev")
 library(hector) 
 assert_that(packageVersion("hector") ==  HECTOR_VERSION)
-
 
 
 # 1. Adjust natural CH4 and N2O emissions -------------------------------------------------------------------------------------------
@@ -134,10 +129,6 @@ optim_nat_hector <- function(comp_data, par){
 par <- c(5, 300)
 names(par) <- c("nat_n2o", "nat_ch4")
 natural_emiss_fit <- optim(par = par, fn = optim_nat_hector, comp_data = ar6_results)
-natural_emiss_fit$par 
-# On May 30 2023 
-# nat_n2o    nat_ch4 
-# 9.718591 340.902647 
 
 save(natural_emiss_fit,
      file = file.path(BASE_DIR, "output", paste0("calibration-natemissions-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
@@ -186,6 +177,19 @@ normalize_to_giss <- function(data){
   return(data)
 }
 
+# Normalize temperature to the historical reference period
+# Args 
+#   data: data frame of temperature data
+# Returns a data frame of temperature data normalized to the 1951:1980 reference period
+normalize_to_hadcrut <- function(data){
+  
+  assert_that(unique(data[["variable"]]) == "gmst")
+  
+  ref_value <- mean(data[(data$year %in%  1961:1990), ]$value)
+  data$value <- data$value - ref_value
+  
+  return(data)
+}
 
 # Set up a Hector core with the correct parameter values, Hector is emission driven
 # Arg
@@ -210,31 +214,38 @@ prep_core <- function(filename){
 
 # Import and format the comparison data!
 
-# GISTEMP Analysis (the GISS Surface Temperature Analysis)
-# For the GISS analysis, normal always means the average over 
-# the 30-year period 1951-1980 for that place and time of year.
-# This base period is specific to GISS, not universal. 
-# 
-# GISTEMP Team, 2022: GISS Surface Temperature Analysis (GISTEMP), version 4.
-# NASA Goddard Institute for Space Studies. Dataset accessed 20YY-MM-DD at https://data.giss.nasa.gov/gistemp/.
-#
-# Lenssen, N., G. Schmidt, J. Hansen, M. Menne, A. Persin, R. Ruedy, and D. Zyss, 2019: 
-# Improvements in the GISTEMP uncertainty model. J. Geophys. Res. Atmos., 124, no. 12, 
-# 6307-6326, doi:10.1029/2018JD029522.
-read.csv(here::here("data", "calibration", "GISTEMP_v4_20221014.csv"), skip = 1) %>% 
-  select(year = Year, value = `J.D`) %>% 
-  mutate(value = as.numeric(value)) %>% 
-  na.omit() %>% 
-  mutate(variable = "gmst") -> 
-  gmst_obs_data
+# Hadcrut5
+# Global mean surface temperature anomaly
+# https://www.metoffice.gov.uk/hadobs/hadcrut5/data/current/download.html
+# The temperature anomaly is based off of 1961–1990
+# surface temperature with the anomaly!
+# Morice, C. P., Kennedy, J. J., Rayner, N. A., Winn, J. P., Hogan, E., Killick, R. E., et al. (2021).
+# An updated assessment of near-surface temperature change from 1850: the HadCRUT5 data
+# set. Journal of Geophysical Research: Atmospheres, 126, e2019JD032361.
+# https://doi.org/10.1029/2019JD032361
+here::here("data", "HadCRUT5.csv") %>%
+  read.csv(stringsAsFactors = FALSE) %>% 
+  na.omit ->
+  hadcrut_obs_data
+
+names(hadcrut_obs_data) <- c("year", "value", "lower", "upper")
+hadcrut_obs_data$variable <- "gmst"
+gmst_obs_data <- hadcrut_obs_data
 
 
-# Atmospheric CO2 concentrations from the NOAA Global Monitoring Laboratory
-# Dr. Pieter Tans, NOAA/GML (gml.noaa.gov/ccgg/trends/) and Dr. Ralph Keeling, Scripps Institution of Oceanography (scrippsco2.ucsd.edu/).
-read.csv(here::here("data", "calibration", "co2_annmean_mlo.csv"), comment.char = "#") %>% 
-  select(year, value = mean) %>% 
+# Meinshausen, M., Vogel, E., Nauels, A., Lorbacher, K., Meinshausen, N., Etheridge, D. M., 
+# Fraser, P. J., Montzka, S. A., Rayner, P. J., Trudinger, C. M., Krummel, P. B., Beyerle, 
+# U., Canadell, J. G., Daniel, J. S., Enting, I. G., Law, R. M., Lunder, C. R., O'Doherty, 
+# S., Prinn, R. G., Reimann, S., Rubino, M., Velders, G. J. M., Vollmer, M. K., Wang, 
+# R. H. J., and Weiss, R.: Historical greenhouse gas concentrations for climate modelling 
+# (CMIP6), Geosci. Model Dev., 10, 2057–2116, https://doi.org/10.5194/gmd-10-2057-2017, 2017.
+here::here("data", "Supplementary_Table_UoM_GHGConcentrations-1-1-0_annualmeans_v23March2017.csv") %>%  
+  read.csv(skip = 21) %>% 
+  na.omit %>% 
+  select(year =  "v.YEARS.GAS..", value = "CO2") %>% 
   mutate(variable = CONCENTRATIONS_CO2()) -> 
   co2_obs_data
+
 
 # Calculate the MSE between Hector output and observations, this function will be used by optim to 
 # minimze the MSE ()
@@ -262,7 +273,7 @@ get_mse <- function(p, gmst_obs, co2_obs){
     run(hc)
     
     # Fetch the gmst results from the Hector core & calculate the normalized MSE. 
-    hector_gmst <- normalize_to_giss(fetchvars(hc, gmst_obs$year, vars = GMST()))
+    hector_gmst <- normalize_to_hadcrut(fetchvars(hc, gmst_obs$year, vars = GMST()))
     hector_gmst <- hector_gmst[hector_gmst$year %in% gmst_obs$year, ]
     MSE_gmst <- mean((hector_gmst$value - gmst_obs$value)^2)
     message("gmst: ", MSE_gmst)
@@ -288,7 +299,14 @@ get_mse <- function(p, gmst_obs, co2_obs){
 
 
 # An inital guess for the values 
-params <- c("diff" = 1, "q10_rh" = 2.2, "beta" = 0.23)
+params <- c("diff" = 2.3, 
+           "q10_rh" = 2.2,
+            "beta" = 0.5)
+
+# Set the bounds for the potential parameters based off of Brown et. al 2024
+sd <- c(0.1, 0.44, 0.232)
+lower <- params - sd
+upper <- params + sd
 
 # Test out the get_mse function 
 get_mse(params, gmst_obs = gmst_obs_data,  co2_obs = co2_obs_data)
@@ -297,7 +315,9 @@ get_mse(params, gmst_obs = gmst_obs_data,  co2_obs = co2_obs_data)
 fit <- optim(get_mse, 
              p = params,
              gmst_obs = gmst_obs_data,
-             co2_obs = co2_obs_data)
+             co2_obs = co2_obs_data, 
+             lower = lower, 
+             upper = upper, method = "L-BFGS-B")
 
 save(fit, file = file.path(BASE_DIR, "output", paste0("calibration-diff_beta_q10-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
 
