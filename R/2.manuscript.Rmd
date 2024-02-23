@@ -52,13 +52,13 @@ hector_version <- HECTOR_VERSION
 ## Load Hector Results
 
 ```{r, echo=TRUE}
-list.files(HECTOR_RSLTS_DIR, pattern = "hector_3.1.1_ssp.csv", full.names = TRUE) %>%
+list.files(HECTOR_RSLTS_DIR, pattern = "hector_3.2.0_ssp.csv", full.names = TRUE) %>%
   lapply(read.csv) %>%
   do.call(what = "rbind") %>% 
   filter(year <= 2100) -> 
   hector_ssp
 
-list.files(HECTOR_RSLTS_DIR, pattern = "hector_3.1.1_ssp-conc.csv", full.names = TRUE) %>%
+list.files(HECTOR_RSLTS_DIR, pattern = "hector_3.2.0_ssp-conc.csv", full.names = TRUE) %>%
   lapply(read.csv) %>%
   do.call(what = "rbind") %>% 
   filter(year <= 2100) -> 
@@ -116,7 +116,7 @@ ggplot() +
   theme(legend.position = "bottom") -> 
   plot; plot
 
-ggsave(plot, filename = file.path(FIGS_DIR, "co2_observations.png"), 
+ggsave(plot, filename = file.path(FIGS_DIR, "Fig-2.png"), 
        width = MANUSCRIPT_FIG$width, height = MANUSCRIPT_FIG$height)
 ```
 
@@ -218,7 +218,7 @@ ggplot() +
   plot; plot
 big_plot <- plot 
 
-ggsave(plot, filename = file.path(FIGS_DIR, "gmst_observations.png"), 
+ggsave(plot, filename = file.path(FIGS_DIR, "Fig-3.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 ```
 
@@ -250,7 +250,7 @@ ggplot() +
   mini_plot
 
 
-ggsave(mini_plot, filename = file.path(FIGS_DIR, "gmst_observations-min.png"), 
+ggsave(mini_plot, filename = file.path(FIGS_DIR, "Fig-3_inset.png"), 
        width = MANUSCRIPT_FIG$width+1, height = MANUSCRIPT_FIG$height + 1)
 
 ```
@@ -390,8 +390,8 @@ ggplot() +
   theme(axis.text.x = element_text(angle = 45, vjust = 0.5, hjust=1)) -> 
   plot; plot
 
-ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_temps-ranges.png"), 
-       width = MANUSCRIPT_FIG$width * 1.25, height = MANUSCRIPT_FIG$height * 1.25)
+# ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_temps-ranges.png"), 
+#        width = MANUSCRIPT_FIG$width * 1.25, height = MANUSCRIPT_FIG$height * 1.25)
 ```
 
 ```{r}
@@ -410,30 +410,9 @@ ggplot() +
   plot; plot
 
 
-ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_temps-spaget.png"), 
+ggsave(plot, filename = file.path(FIGS_DIR, "Fig-4.png"), 
        width = MANUSCRIPT_FIG$width * 1.25, height = MANUSCRIPT_FIG$height * 1.25)
 
-```
-Summary statistics on where the Hector results fall within the stuff 
-
-```{r}
-cmip6_rslts %>% 
-  filter(id == "very likely") %>% 
-  group_by(scenario, year, variable, id) %>% 
-  summarise(min = min(value), 
-            max = max(value), 
-            mean = mean(value), 
-            q25 = quantile(value, 1/4), 
-            q75 = quantile(value, 3/4)) -> 
-  summary_stats
-
-
-summary_stats %>% 
-  inner_join(hector_temp) %>% 
-  ungroup() %>% 
-  filter(value > max) %>% 
-  select(scenario, variable) %>% 
-  distinct()
 ```
 
 
@@ -442,7 +421,7 @@ summary_stats %>%
 
 ```{r}
 max_yr <- 150
-hector_idealized <- read.csv(file.path(HECTOR_RSLTS_DIR, "hector_3.1.1_idealized.csv")) %>% 
+hector_idealized <- read.csv(file.path(HECTOR_RSLTS_DIR, "hector_3.2.0_idealized.csv")) %>% 
   filter(variable == GLOBAL_TAS()) %>% 
   mutate(scenario = if_else(scenario ==  "abruptx4CO2", "abrupt-4xCO2", scenario)) %>% 
   filter(year <= max_yr)
@@ -458,8 +437,9 @@ ggplot() +
             linewidth = 1) + 
   facet_wrap("scenario", scales = "free") + 
   labs(y = expression("Temperature anomaly ("~degree~"C)"), x = "Years") + 
-  scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]], 
-                                "CMIP6 ESM" = "#5A5A5A")) + 
+  scale_color_manual(values = c("Hector V3" = OBS_SCHEME[["Hector v3"]],
+                                "CMIP6 ESM" = "#5A5A5A",
+                                "rcmip" = "black")) +
   theme(panel.grid.minor.x = element_blank(), 
         panel.grid.minor.y = element_blank(), 
         legend.position = "bottom") + 
@@ -467,7 +447,7 @@ ggplot() +
   plot; plot
 
 
-ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_tas-idealized.png"), 
+ggsave(plot, filename = file.path(FIGS_DIR, "Fig-5.png"), 
        width = MANUSCRIPT_FIG$width * 1.25, height = MANUSCRIPT_FIG$height * 1.25)
 
 ```
@@ -480,7 +460,7 @@ ggsave(plot, filename = file.path(FIGS_DIR, "hector_cmip_tas-idealized.png"),
 ```{r, warning=FALSE}
 # Read in the IPCC results 
 ipcc_data <- read.csv(here::here("data", "IPCC_co2_tas.csv"))
-hector_tas_v_co2 <- read.csv(here::here("output", "hector_output", "hector_3.1.1_IPCCemiss_co2_tas.csv"))
+hector_tas_v_co2 <- read.csv(here::here("output", "hector_output", "hector_3.2.0_IPCCemiss_co2_tas.csv"))
 
 colors_to_use <- SSP_COLORS[names(SSP_COLORS) %in% ipcc_data$scenario]
 
@@ -488,7 +468,7 @@ ggplot() +
   geom_ribbon(data = ipcc_data, aes(co2, ymin = min, 
                                     ymax = max, fill = scenario), alpha = 0.1) + 
   geom_line(data = ipcc_data, aes(co2, obs, color = "Obs", linetype = "Observations")) +
-  geom_line(data = hector_tas_v_co2, aes(co2, gmst, color = scenario), linewidth = 0.75) +
+  geom_line(data = hector_tas_v_co2, aes(co2, tas, color = scenario), linewidth = 0.75) +
   scale_fill_manual(values = colors_to_use) + 
   scale_color_manual(values = colors_to_use) + 
   labs(y = expression("Temperature anomaly relative to 1850-1900 ("~degree~"C)"),
@@ -502,16 +482,10 @@ ggplot() +
   NULL -> 
   plot; plot
 
-ggsave(plot, filename = file.path(FIGS_DIR, "recreate_IPCC_fig.png"), 
-       width = MANUSCRIPT_FIG$width * 2, height = MANUSCRIPT_FIG$height * 1.75)
+# ggsave(plot, filename = file.path(FIGS_DIR, "recreate_IPCC_fig.png"), 
+#        width = MANUSCRIPT_FIG$width * 2, height = MANUSCRIPT_FIG$height * 1.75)
 ```
 
-
-Get information about the TCRE
-```{r}
-fit <- lm(data = hector_tas_v_co2, formula = gmst~co2)
-fit$coefficients[[2]]* 1000 * 3.67
-```
 
 ## Recreating Table SPM.1
 

@@ -19,7 +19,6 @@ if(use_pkg_ini){
 
 # Make sure the ini files being used are consistent with the calibration results from 
 # part A. This check was only important before the V3 release.
-#source(file.path(BASE_DIR, "R", "0C.check_ini_values.R"))
 OUTPUT_DIR <- file.path(BASE_DIR, "output", "hector_output")
 
 

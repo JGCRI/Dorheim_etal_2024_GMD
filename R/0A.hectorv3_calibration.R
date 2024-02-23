@@ -6,15 +6,9 @@
 # ini files needs to be done manually (TODO figure out a way to update all parameter
 # ini files in some reproducible manner). 
 
-# 0. Set up -------------------------------------------------------------------------------------------
-# The required packages 
+# 0. Set up -----------------------------------------------------------------------------------------------------------------------
 source("R/0.set_up.R")
-source("R/0.constants.R")
-
-# Make sure the correct version of Hector is being used. 
-remotes::install_github("JGCRI/hector@dev")
-library(hector) 
-assert_that(packageVersion("hector") ==  HECTOR_VERSION)
+source("R/0.functions.R")
 
 
 # 1. Adjust natural CH4 and N2O emissions -------------------------------------------------------------------------------------------
@@ -134,7 +128,7 @@ save(natural_emiss_fit,
      file = file.path(BASE_DIR, "output", paste0("calibration-natemissions-", gsub(date(), pattern = " ", replacement = "_"), ".rda")))
 
 remove("ar6_names", "ar6_results", "core_list", "format_data", "get_ar6_data", "hector_names",
-       "ini_files", "optim_nat_hector", "par", "result")
+       "ini_files", "optim_nat_hector", "par")
 
 
 # 2. Calibrate to Historical Observations -------------------------------------------------------------------------------------------

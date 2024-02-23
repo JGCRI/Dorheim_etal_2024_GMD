@@ -4,8 +4,10 @@
 BASE_DIR <- here::here()
 
 # Define which version of Hector should be used here! 
-# TODO this should be updated to Hector V 3.2.0 
-HECTOR_VERSION <-  "3.1.1"
+HECTOR_VERSION <-  "3.2.0"
+library(hector)
+stopifnot(packageVersion("hector") == HECTOR_VERSION)
+
 
 param_rda <- file.path(BASE_DIR, "output", "calibration-diff_beta_q10-Tue_Feb_13_09:57:15_2024.rda")
 nat_emiss_rda <- file.path(BASE_DIR, "output", "calibration-natemissions-Tue_Feb_13_09:53:00_2024.rda")
@@ -23,7 +25,7 @@ load(param_rda)
 load(nat_emiss_rda)
 
 
-# library calls 
+# set up the environment 
 library(assertthat)
 library(data.table)
 library(dplyr)
@@ -33,8 +35,7 @@ library(readxl)
 library(tidyr)
 library(zoo)
 
-# TODO need to add a check that we are working with the correct version! 
-library(hector)
+
 
 
 

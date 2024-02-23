@@ -1,0 +1,33 @@
+"metric","value","period"
+"ECS",3,NA
+"TCRE",1.51115258842297,NA
+"TCR",1.51115258842297,NA
+"gsat_warming",0.730189828064502,NA
+"ocean heat content",471.007531363571,NA
+"aerosol rf",-0.416975348666785,NA
+"WMGHG ERF",3.87181435270071,NA
+"methane ERF",0.539827874850664,NA
+"ssp119",0.73,"near term"
+"ssp119",0.895,"mid term"
+"ssp119",0.717,"long term"
+"ssp126",0.745,"near term"
+"ssp126",1.08,"mid term"
+"ssp126",1.1,"long term"
+"ssp245",0.75,"near term"
+"ssp245",1.29,"mid term"
+"ssp245",1.98,"long term"
+"ssp370",0.761,"near term"
+"ssp370",1.43,"mid term"
+"ssp370",2.94,"long term"
+"ssp434",0.725,"near term"
+"ssp434",1.11,"mid term"
+"ssp434",1.37,"long term"
+"ssp460",0.756,"near term"
+"ssp460",1.34,"mid term"
+"ssp460",2.3,"long term"
+"ssp534-over",0.877,"near term"
+"ssp534-over",1.63,"mid term"
+"ssp534-over",1.69,"long term"
+"ssp585",0.877,"near term"
+"ssp585",1.74,"mid term"
+"ssp585",3.79,"long term"

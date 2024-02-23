@@ -202,8 +202,8 @@ system.file("input", package = "hector") %>%
   list.files(pattern = "ssp119", full.names = TRUE) %>% 
   lapply(function(f){
     scn <- gsub(x = basename(f), pattern = "hector_|.ini", replacement = "")
-     core <- my_newcore(ini = f, name = "historical")
-   # core <- newcore(inifile = f, name = "historical")
+    core <- my_newcore(ini = f, name = "historical")
+    # core <- newcore(inifile = f, name = "historical")
     setvar(core, dates = new_hector_luc_hist$year, var = LUC_EMISSIONS(), 
            values = new_hector_luc_hist$value, unit = "Pg C/yr")
     reset(core)
@@ -289,15 +289,16 @@ rbind(hist_cumsum_co2,
       future_cumsum_co2) %>%  
   rename(co2 = value) %>% 
   select(year, scenario, co2) -> 
-final_hector_cumsum_co2 
+  final_hector_cumsum_co2 
 
 # Normalize the Hector temperature results to the reference period used in the figure of 
 # 1850:1900
 hector_rslts %>%
-  filter(variable %in% c("gmst")) %>% 
+  filter(variable %in% c(GLOBAL_TAS())) %>% 
   normalize_hector_temp(period = 1850:1900) %>%  
-  select(year, scenario, gmst = value) -> 
+  select(year, scenario, tas = value, variable) -> 
   gmst_normalized
+
 
 final_hector_cumsum_co2 %>% 
   inner_join(gmst_normalized, by = c("year", "scenario")) ->

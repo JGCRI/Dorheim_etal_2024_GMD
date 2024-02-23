@@ -1,7 +1,7 @@
 # Normalize  Hector temperature
 #
 # Args
-#   data: data frame of Hector results for mulitple experiments
+#   data: data frame of Hector results for multiple experiments
 #   period: vector of the years in the reference period
 # Return: data frame of normalized values.
 normalize_hector_temp <- function(data, period){
