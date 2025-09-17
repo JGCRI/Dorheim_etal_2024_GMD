@@ -1,10 +1,10 @@
 [![DOI](https://zenodo.org/badge/465728800.svg)](https://zenodo.org/badge/latestdoi/465728800)
-[![Active](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/badges/latest/active.svg)
+[![Published](https://img.shields.io/badge/Published-Final-<Green>.svg)]([[https://shields.io/](https://doi.org/10.5194/gmd-17-4855-2024)](https://doi.org/10.5194/gmd-17-4855-2024))
 
-  
 # Dorheim et al GMD
 
-The single access point to reproduce the results, experiments, and figures for the “Hector V3: functionality and performance of a reduced-complexity climate model for scientific and policy analyses”, which was submitted to GMD in summer of 2023. This repository status will be listed as "Active" defined as "The project has reached a stable, usable state and is being actively developed"^[https://www.repostatus.org/#active] as we anticipate changes to the repository until the associated manuscript is in its final form. 
+Dorheim, K., Gering, S., Gieseke, R., Hartin, C., Pressburger, L., Shiklomanov, A. N., et al. (2024). Hector V3.2.0: functionality and performance of a reduced-complexity climate model. Geoscientific Model Development, 17(12), 4855–4869. https://doi.org/10.5194/gmd-17-4855-2024
+
 
 ## Description of Contents 
 
